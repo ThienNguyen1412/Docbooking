@@ -31,7 +31,7 @@ class ServiceScreen extends StatelessWidget {
 // 1. HEADER
 Widget _buildWelcomeHeader(BuildContext context) {
   final unreadCount = unreadNotifications.where((n) => !n.isRead).length;
-
+  String avatarUrl = 'https://img.lovepik.com/free-png/20220101/lovepik-tortoise-png-image_401154498_wh860.png';
   return Row(
     mainAxisAlignment: MainAxisAlignment.spaceBetween,
     children: [
@@ -68,8 +68,7 @@ Widget _buildWelcomeHeader(BuildContext context) {
           const SizedBox(width: 10),
           CircleAvatar(
             radius: 25,
-            backgroundColor: Colors.blue[100],
-            child: const Icon(Icons.person, color: Colors.blue),
+            backgroundImage: NetworkImage(avatarUrl)
           ),
         ],
       ),

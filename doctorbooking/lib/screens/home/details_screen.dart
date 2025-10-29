@@ -1,24 +1,22 @@
-// File: screens/home/details_screen.dart
-
 import 'package:flutter/material.dart';
-import '../../models/doctor.dart'; // Đảm bảo model Doctor đã được import
+import '../../models/doctors.dart'; // dùng API model (class Doctors)
 
 // ----------------------------------------------------
 // 1. MÀN HÌNH CHI TIẾT BÁC SĨ (DetailsScreen)
 // ----------------------------------------------------
 class DetailsScreen extends StatelessWidget {
-  final Doctor doctor;
-  // ✨ CẬP NHẬT: Thay đổi chữ ký của hàm để nhận cả BookingDetails
-  final void Function(Doctor, BookingDetails) onBookAppointment; 
-  
+  final Doctors doctor;
+  // CẬP NHẬT: nhận callback với API model Doctors
+  final void Function(Doctors, BookingDetails) onBookAppointment;
+
   const DetailsScreen({
-    super.key, 
+    super.key,
     required this.doctor,
     required this.onBookAppointment,
   });
 
   // Hàm hiển thị Form Đặt lịch Modal
-  void _showBookingForm(BuildContext context, Doctor doctor) {
+  void _showBookingForm(BuildContext context, Doctors doctor) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -28,15 +26,13 @@ class DetailsScreen extends StatelessWidget {
       builder: (BuildContext context) {
         return Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom, 
+            bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
           child: BookingFormModal(
             doctor: doctor,
             onConfirm: (bookingDetails) {
               Navigator.pop(context); // Đóng modal
-              
-              // ✨ SỬA LỖI QUAN TRỌNG: Truyền cả `doctor` và `bookingDetails` lên trên
-              onBookAppointment(doctor, bookingDetails); 
+              onBookAppointment(doctor, bookingDetails);
             },
           ),
         );
@@ -44,11 +40,47 @@ class DetailsScreen extends StatelessWidget {
     );
   }
 
+  Widget _avatarWidget(double radius) {
+    final avatarUrl = doctor.avatarUrl;
+    final displayName = doctor.fullName ?? '';
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: radius,
+        backgroundColor: Colors.grey[200],
+        backgroundImage: NetworkImage(avatarUrl),
+        onBackgroundImageError: (_, __) {
+          // nothing, fallback to initials shown as child
+        },
+        child: Container(), // image will be shown via backgroundImage
+      );
+    }
+    // fallback: initials
+    final initials = displayName.trim().isEmpty
+        ? '?'
+        : displayName
+            .trim()
+            .split(RegExp(r'\s+'))
+            .map((s) => s.isNotEmpty ? s[0] : '')
+            .take(2)
+            .join()
+            .toUpperCase();
+    return CircleAvatar(
+      radius: radius,
+      backgroundColor: Colors.grey.shade200,
+      child: Text(initials, style: TextStyle(fontSize: radius / 2.2, color: Colors.blue.shade700)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final displayName = doctor.fullName ?? 'Không rõ tên';
+    final specialty = doctor.specialtyName ?? '';
+    final hospital = doctor.hospital ?? '';
+    final phone = doctor.phone ?? '';
+
     return Scaffold(
       appBar: AppBar(
-        title: Text(doctor.name),
+        title: Text(displayName),
         backgroundColor: Colors.blue.shade800,
         foregroundColor: Colors.white,
       ),
@@ -61,17 +93,14 @@ class DetailsScreen extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 50,
-                  backgroundImage: NetworkImage(doctor.image),
-                ),
+                _avatarWidget(50),
                 const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        doctor.name,
+                        displayName,
                         style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.bold,
@@ -80,7 +109,7 @@ class DetailsScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 5),
                       Text(
-                        doctor.specialty,
+                        specialty,
                         style: const TextStyle(
                           fontSize: 16,
                           color: Colors.blue,
@@ -88,7 +117,7 @@ class DetailsScreen extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        doctor.hospital,
+                        hospital,
                         style: const TextStyle(
                           fontSize: 14,
                           color: Colors.black54,
@@ -99,7 +128,7 @@ class DetailsScreen extends StatelessWidget {
                         children: [
                           const Icon(Icons.phone, color: Colors.green, size: 18),
                           const SizedBox(width: 5),
-                          Text(doctor.phone),
+                          Text(phone),
                         ],
                       ),
                     ],
@@ -110,67 +139,15 @@ class DetailsScreen extends StatelessWidget {
 
             const SizedBox(height: 20),
 
-            // --- RATING HIỂN THỊ 5 NGÔI SAO ---
-            Row(
-              children: [
-                ...List.generate(5, (index) {
-                  double rating = doctor.rating;
-                  if (index < rating.floor()) {
-                    return const Icon(Icons.star, color: Colors.amber, size: 24);
-                  } else if (index < rating && rating - rating.floor() >= 0.5) {
-                    return const Icon(Icons.star_half, color: Colors.amber, size: 24);
-                  } else {
-                    return const Icon(Icons.star_border, color: Colors.amber, size: 24);
-                  }
-                }),
-                const SizedBox(width: 8),
-                Text(
-                  '${doctor.rating}',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  '(${doctor.reviews} đánh giá)',
-                  style: const TextStyle(color: Colors.grey),
-                ),
-              ],
-            ),
+            // NOTE: rating/reviews/comments were removed because API model doesn't provide them.
+            // If you later extend the API to include rating/comments, re-add display here.
 
             const SizedBox(height: 20),
-
-            // --- BÌNH LUẬN ĐỘNG ---
-            const Text(
-              "Bình luận của bệnh nhân:",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            ...doctor.comments.map(
-              (comment) => Card(
-                margin: const EdgeInsets.only(bottom: 8),
-                elevation: 1,
-                child: Padding(
-                  padding: const EdgeInsets.all(12.0),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.person_pin, color: Colors.blue, size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(comment, style: const TextStyle(fontSize: 14))),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 30),
 
             // --- NÚT ĐẶT LỊCH KHÁM ---
             Center(
               child: SizedBox(
-                width: double.infinity, 
+                width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed: () {
                     _showBookingForm(context, doctor);
@@ -224,9 +201,10 @@ class BookingDetails {
 
 // ----------------------------------------------------
 // 3. WIDGET FORM ĐẶT LỊCH (BookingFormModal)
+//    Note: accepts API model Doctors
 // ----------------------------------------------------
 class BookingFormModal extends StatefulWidget {
-  final Doctor doctor;
+  final Doctors doctor;
   final Function(BookingDetails) onConfirm;
 
   const BookingFormModal({super.key, required this.doctor, required this.onConfirm});
@@ -237,7 +215,7 @@ class BookingFormModal extends StatefulWidget {
 
 class _BookingFormModalState extends State<BookingFormModal> {
   final _formKey = GlobalKey<FormState>();
-  
+
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _addressController = TextEditingController();
@@ -283,6 +261,10 @@ class _BookingFormModalState extends State<BookingFormModal> {
 
   @override
   Widget build(BuildContext context) {
+    final displayName = widget.doctor.fullName ?? '';
+    final specialty = widget.doctor.specialtyName ?? '';
+    final hospital = widget.doctor.hospital ?? '';
+
     return Container(
       padding: const EdgeInsets.all(20),
       height: MediaQuery.of(context).size.height * 0.9,
@@ -295,13 +277,13 @@ class _BookingFormModalState extends State<BookingFormModal> {
             children: <Widget>[
               Center(
                 child: Text(
-                  'Đặt Lịch Khám Bác sĩ ${widget.doctor.name}',
+                  'Đặt Lịch Khám Bác sĩ $displayName',
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.blue),
                 ),
               ),
               const SizedBox(height: 15),
-              Text('Chuyên khoa: ${widget.doctor.specialty}', style: const TextStyle(fontSize: 16)),
-              Text('Bệnh viện: ${widget.doctor.hospital}', style: const TextStyle(fontSize: 16)),
+              Text('Chuyên khoa: $specialty', style: const TextStyle(fontSize: 16)),
+              Text('Bệnh viện: $hospital', style: const TextStyle(fontSize: 16)),
               const Divider(height: 25),
               _buildTextField(
                 controller: _nameController,

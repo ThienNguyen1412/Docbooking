@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "762112815097",
+    "project_id": "ltdd-d560f",
+    "storage_bucket": "ltdd-d560f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:762112815097:android:c4c9a3ad0bdce19f6f5728",
+        "android_client_info": {
+          "package_name": "com.example.doctorbooking"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "762112815097-be9t4everd2h05njbkea3t8jhkq0kg6s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDvyej09GQzSgzK6m6VQ3LN0mgzj-osJ3s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "762112815097-be9t4everd2h05njbkea3t8jhkq0kg6s.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

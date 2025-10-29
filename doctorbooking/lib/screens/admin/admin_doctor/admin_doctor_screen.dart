@@ -1,8 +1,7 @@
-// File: lib/screens/admin/admin_doctor/admin_doctor_screen.dart
-
 import 'package:flutter/material.dart';
-import '../../../../models/doctor.dart';
+import 'package:doctorbooking/models/doctors.dart';
 import 'add_edit_doctor_screen.dart';
+import 'package:doctorbooking/services/doctor.dart';
 
 class AdminDoctorScreen extends StatefulWidget {
   const AdminDoctorScreen({super.key});
@@ -12,33 +11,58 @@ class AdminDoctorScreen extends StatefulWidget {
 }
 
 class _AdminDoctorScreenState extends State<AdminDoctorScreen> {
-  // Tạo bản sao có thể thay đổi của danh sách bác sĩ
-  List<Doctor> _doctors = [];
+  List<Doctors> _doctors = [];
   String _searchQuery = '';
+
+  bool _isLoading = true;
+  String? _loadingError;
+
+  // track id of item being deleted to show progress on that item
+  String? _deletingId;
 
   @override
   void initState() {
     super.initState();
-    // Khởi tạo danh sách từ model để có thể thêm/sửa/xóa
-    _doctors = List.from(Doctor.getDoctors());
+    _loadDoctors();
   }
 
-  List<Doctor> get _filteredDoctors {
+  Future<void> _loadDoctors() async {
+    setState(() {
+      _isLoading = true;
+      _loadingError = null;
+    });
+
+    try {
+      final list = await DoctorService.instance.fetchDoctors();
+      if (!mounted) return;
+      setState(() {
+        _doctors = list;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingError = e.toString().replaceFirst('Exception: ', '');
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
+  }
+
+  List<Doctors> get _filteredDoctors {
     if (_searchQuery.isEmpty) {
       return _doctors;
     }
     final query = _searchQuery.toLowerCase();
     return _doctors.where((doctor) {
-      return doctor.name.toLowerCase().contains(query) ||
-             doctor.specialty.toLowerCase().contains(query);
+      final name = (doctor.fullName ?? '').toLowerCase();
+      final spec = (doctor.specialtyName).toLowerCase();
+      return name.contains(query) || spec.contains(query);
     }).toList();
   }
 
-  // --- CÁC HÀM XỬ LÝ THÊM/SỬA/XÓA ---
-
-  // 1. Điều hướng đến trang Thêm Bác sĩ
   void _navigateAndAddDoctor(BuildContext context) async {
-    final newDoctor = await Navigator.of(context).push<Doctor>(
+    final newDoctor = await Navigator.of(context).push<Doctors>(
       MaterialPageRoute(builder: (ctx) => const AddEditDoctorScreen()),
     );
 
@@ -46,13 +70,15 @@ class _AdminDoctorScreenState extends State<AdminDoctorScreen> {
       setState(() {
         _doctors.add(newDoctor);
       });
-      _showSuccessSnackBar('Đã thêm thành công Bác sĩ ${newDoctor.name}');
+      _showSnack('Đã thêm thành công Bác sĩ ${newDoctor.fullName ?? ''}');
     }
   }
 
-  // 2. Điều hướng đến trang Sửa Bác sĩ
-  void _navigateAndEditDoctor(BuildContext context, Doctor doctorToEdit) async {
-    final updatedDoctor = await Navigator.of(context).push<Doctor>(
+  void _navigateAndEditDoctor(
+    BuildContext context,
+    Doctors doctorToEdit,
+  ) async {
+    final updatedDoctor = await Navigator.of(context).push<Doctors>(
       MaterialPageRoute(
         builder: (ctx) => AddEditDoctorScreen(doctor: doctorToEdit),
       ),
@@ -65,63 +91,113 @@ class _AdminDoctorScreenState extends State<AdminDoctorScreen> {
           _doctors[index] = updatedDoctor;
         }
       });
-      _showSuccessSnackBar('Đã cập nhật thông tin Bác sĩ ${updatedDoctor.name}');
+      _showSnack(
+        'Đã cập nhật thông tin Bác sĩ ${updatedDoctor.fullName ?? ''}',
+      );
     }
   }
 
-  // 3. Hiển thị dialog xác nhận Xóa
-  void _showDeleteConfirmationDialog(BuildContext context, Doctor doctor) {
-    showDialog(
+  Future<void> _confirmAndDelete(BuildContext context, Doctors doctor) async {
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
         title: const Text('Xác nhận xóa'),
-        content: Text('Bạn có chắc chắn muốn xóa Bác sĩ ${doctor.name} không? Thao tác này không thể hoàn tác.'),
+        content: Text(
+          'Bạn có chắc chắn muốn xóa Bác sĩ ${doctor.fullName ?? ''} không? Thao tác này không thể hoàn tác.',
+        ),
         actions: [
           TextButton(
             child: const Text('Không'),
-            onPressed: () => Navigator.of(ctx).pop(),
+            onPressed: () => Navigator.of(ctx).pop(false),
           ),
           TextButton(
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Xóa'),
-            onPressed: () {
-              setState(() {
-                _doctors.removeWhere((d) => d.id == doctor.id);
-              });
-              Navigator.of(ctx).pop();
-              _showSuccessSnackBar('Đã xóa Bác sĩ ${doctor.name}', isError: true);
-            },
+            onPressed: () => Navigator.of(ctx).pop(true),
           ),
         ],
       ),
     );
+
+    if (confirmed != true) return;
+
+    setState(() => _deletingId = doctor.id);
+
+    try {
+      await DoctorService.instance.deleteDoctor(doctor.id);
+      if (!mounted) return;
+      setState(() => _doctors.removeWhere((d) => d.id == doctor.id));
+      _showSnack('Đã xóa Bác sĩ ${doctor.fullName ?? ''}', isError: true);
+    } catch (e) {
+      if (!mounted) return;
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      _showSnack('Xóa thất bại: $msg', isError: true);
+    } finally {
+      if (!mounted) return;
+      setState(() => _deletingId = null);
+    }
   }
 
-  // Hàm helper để hiển thị SnackBar
-  void _showSuccessSnackBar(String message, {bool isError = false}) {
-     ScaffoldMessenger.of(context)
+  void _showSnack(String message, {bool isError = false}) {
+    ScaffoldMessenger.of(context)
       ..removeCurrentSnackBar()
-      ..showSnackBar(SnackBar(
-        content: Text(message),
-        backgroundColor: isError ? Colors.red.shade600 : Colors.green.shade600,
-        behavior: SnackBarBehavior.floating,
-      ));
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: isError
+              ? Colors.red.shade600
+              : Colors.green.shade600,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+
+  Widget _buildAvatar(Doctors doctor) {
+    final avatar = doctor.avatarUrl;
+    final displayName = doctor.fullName ?? '';
+    final initials = displayName.isEmpty
+        ? '?'
+        : displayName
+              .trim()
+              .split(RegExp(r'\s+'))
+              .map((s) => s.isNotEmpty ? s[0] : '')
+              .take(2)
+              .join()
+              .toUpperCase();
+
+    if (avatar != null && avatar.isNotEmpty) {
+      return CircleAvatar(
+        radius: 30,
+        backgroundColor: Colors.grey[200],
+        backgroundImage: NetworkImage(avatar),
+        onBackgroundImageError: (_, __) {
+          // fallback will show child
+        },
+        child: Container(),
+      );
+    }
+
+    return CircleAvatar(
+      radius: 30,
+      backgroundColor: Colors.grey.shade200,
+      child: Text(
+        initials,
+        style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+
       body: Column(
         children: [
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: TextField(
-              onChanged: (value) {
-                setState(() {
-                  _searchQuery = value;
-                });
-              },
+              onChanged: (value) => setState(() => _searchQuery = value),
               decoration: InputDecoration(
                 hintText: 'Tìm kiếm Bác sĩ theo tên hoặc chuyên khoa...',
                 prefixIcon: const Icon(Icons.search),
@@ -134,8 +210,12 @@ class _AdminDoctorScreenState extends State<AdminDoctorScreen> {
               ),
             ),
           ),
+
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 8.0,
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -146,21 +226,187 @@ class _AdminDoctorScreenState extends State<AdminDoctorScreen> {
                 Chip(
                   label: Text('Tổng: ${_filteredDoctors.length}'),
                   backgroundColor: Colors.blue.withOpacity(0.1),
-                  labelStyle: TextStyle(color: Colors.blue.shade800, fontWeight: FontWeight.bold),
-                )
+                  labelStyle: TextStyle(
+                    color: Colors.blue.shade800,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           ),
+
           Expanded(
-            child: _filteredDoctors.isEmpty
-                ? const Center(child: Text('Không tìm thấy bác sĩ nào.'))
-                : ListView.builder(
-                    padding: const EdgeInsets.only(bottom: 80),
-                    itemCount: _filteredDoctors.length,
-                    itemBuilder: (context, index) {
-                      final doctor = _filteredDoctors[index];
-                      return _buildDoctorCard(context, doctor);
-                    },
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : (_loadingError != null)
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Lỗi khi tải danh sách: $_loadingError',
+                            textAlign: TextAlign.center,
+                          ),
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            onPressed: _loadDoctors,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Thử lại'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                : RefreshIndicator(
+                    onRefresh: _loadDoctors,
+                    child: _filteredDoctors.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: const [
+                              SizedBox(height: 80),
+                              Center(child: Text('Không tìm thấy bác sĩ nào.')),
+                            ],
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.only(bottom: 80),
+                            itemCount: _filteredDoctors.length,
+                            itemBuilder: (context, index) {
+                              final doctor = _filteredDoctors[index];
+                              final deletingThis = _deletingId == doctor.id;
+                              return Card(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                elevation: 3,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(15),
+                                ),
+                                child: ListTile(
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 8,
+                                  ),
+                                  leading: _buildAvatar(doctor),
+                                  title: Text(
+                                    doctor.fullName ?? 'Không rõ tên',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 16,
+                                      color: Color(0xFF0D47A1),
+                                    ),
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        doctor.specialtyName,
+                                        style: TextStyle(
+                                          color: Colors.blue.shade700,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      if ((doctor.hospital ?? '').isNotEmpty)
+                                        Text(
+                                          doctor.hospital!,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.black54,
+                                          ),
+                                        ),
+                                      if ((doctor.phone ?? '').isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(
+                                            top: 6.0,
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              const Icon(
+                                                Icons.phone,
+                                                size: 14,
+                                                color: Colors.black45,
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Text(
+                                                doctor.phone!,
+                                                style: const TextStyle(
+                                                  fontSize: 13,
+                                                  color: Colors.black54,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                  trailing: deletingThis
+                                      ? const SizedBox(
+                                          width: 36,
+                                          height: 36,
+                                          child: Center(
+                                            child: SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : PopupMenuButton<String>(
+                                          icon: const Icon(Icons.more_vert),
+                                          onSelected: (value) {
+                                            if (value == 'edit') {
+                                              _navigateAndEditDoctor(
+                                                context,
+                                                doctor,
+                                              );
+                                            } else if (value == 'delete') {
+                                              _confirmAndDelete(
+                                                context,
+                                                doctor,
+                                              );
+                                            }
+                                          },
+                                          itemBuilder: (BuildContext context) =>
+                                              <PopupMenuEntry<String>>[
+                                                const PopupMenuItem<String>(
+                                                  value: 'edit',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.edit_outlined,
+                                                        color: Colors.blue,
+                                                      ),
+                                                      SizedBox(width: 8),
+                                                      Text('Sửa'),
+                                                    ],
+                                                  ),
+                                                ),
+                                                const PopupMenuItem<String>(
+                                                  value: 'delete',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.delete_outline,
+                                                        color: Colors.red,
+                                                      ),
+                                                      SizedBox(width: 8),
+                                                      Text('Xóa'),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                        ),
+                                ),
+                              );
+                            },
+                          ),
                   ),
           ),
         ],
@@ -171,78 +417,7 @@ class _AdminDoctorScreenState extends State<AdminDoctorScreen> {
         tooltip: 'Thêm Bác sĩ mới',
         child: const Icon(Icons.add, color: Colors.white),
       ),
-    );
-  }
-
-  Widget _buildDoctorCard(BuildContext context, Doctor doctor) {
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          radius: 30,
-          backgroundImage: NetworkImage(doctor.image),
-          onBackgroundImageError: (exception, stackTrace) {
-             // Có thể hiển thị icon mặc định khi ảnh lỗi
-          },
-        ),
-        title: Text(
-          doctor.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Color(0xFF0D47A1)),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 4),
-            Text(
-              doctor.specialty,
-              style: TextStyle(color: doctor.color, fontWeight: FontWeight.w600),
-            ),
-            Row(
-              children: [
-                const Icon(Icons.star, color: Colors.amber, size: 16),
-                const SizedBox(width: 4),
-                Text('${doctor.rating} (${doctor.reviews} đánh giá)'),
-              ],
-            ),
-            Text(doctor.hospital, style: const TextStyle(fontSize: 13, color: Colors.black54)),
-          ],
-        ),
-        trailing: PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert),
-          onSelected: (value) {
-            if (value == 'edit') {
-              _navigateAndEditDoctor(context, doctor);
-            } else if (value == 'delete') {
-              _showDeleteConfirmationDialog(context, doctor);
-            }
-          },
-          itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-            const PopupMenuItem<String>(
-              value: 'edit',
-              child: Row(
-                children: [
-                  Icon(Icons.edit_outlined, color: Colors.blue),
-                  SizedBox(width: 8),
-                  Text('Sửa'),
-                ],
-              ),
-            ),
-            const PopupMenuItem<String>(
-              value: 'delete',
-              child: Row(
-                children: [
-                  Icon(Icons.delete_outline, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Xóa'),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+      
     );
   }
 }

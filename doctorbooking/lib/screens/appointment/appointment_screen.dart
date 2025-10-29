@@ -1,7 +1,5 @@
-// File: screens/appointment/appointment_screen.dart
-
 import 'package:flutter/material.dart';
-import '../../models/doctor.dart';
+import '../../models/doctors.dart'; // use API model (Doctors) for booking callback
 import 'book_new_appointment_screen.dart';
 import 'appointment_detail_screen.dart';
 import '../../models/appointment.dart' as model;
@@ -12,8 +10,9 @@ class AppointmentScreen extends StatelessWidget {
   final List<model.Appointment> appointments;
   final Function(model.Appointment) onDelete;
   final Function(model.Appointment) onEdit;
-  final void Function(Doctor, BookingDetails) onBookAppointment;
-  
+
+  // Use Doctors (API model) to match BookNewAppointmentScreen and DetailsScreen
+  final void Function(Doctors, BookingDetails) onBookAppointment;
 
   const AppointmentScreen({
     super.key,
@@ -53,7 +52,7 @@ class AppointmentScreen extends StatelessWidget {
               appointments: appointments,
               onDelete: onDelete,
               onEdit: onEdit,
-              statusFilter: const ['Pending'], 
+              statusFilter: const ['Pending'],
             ),
             // Tab 2: Chỉ hiển thị 'Confirmed'
             AppointmentListView(
@@ -67,14 +66,14 @@ class AppointmentScreen extends StatelessWidget {
               appointments: appointments,
               onDelete: onDelete,
               onEdit: onEdit,
-              statusFilter: const ['Completed'], 
+              statusFilter: const ['Completed'],
             ),
             // Tab 4: Chỉ hiển thị 'Canceled'
             AppointmentListView(
               appointments: appointments,
               onDelete: onDelete,
               onEdit: onEdit,
-              statusFilter: const ['Canceled'], 
+              statusFilter: const ['Canceled'],
             ),
           ],
         ),
@@ -112,8 +111,8 @@ class AppointmentListView extends StatelessWidget {
     required this.onEdit,
     required this.statusFilter,
   });
-  
-    // HÀM HIỂN THỊ HỘP THOẠI XÁC NHẬN HỦY
+
+  // HÀM HIỂN THỊ HỘP THOẠI XÁC NHẬN HỦY
   void _showCancelConfirmationDialog(BuildContext context, model.Appointment appointment) {
     showDialog(
       context: context,
@@ -236,12 +235,11 @@ class AppointmentListView extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) =>
-                      AppointmentDetailScreen(
-                        appointment: appointment,
-                        onEdit: onEdit,
-                        onDelete: onDelete,
-                      ),
+                  builder: (context) => AppointmentDetailScreen(
+                    appointment: appointment,
+                    onEdit: onEdit,
+                    onDelete: onDelete,
+                  ),
                 ),
               );
             },

@@ -6,7 +6,7 @@ import '../../../data/mock_database.dart';
 import 'admin_appointment/admin_appointment_screen.dart'; 
 import 'admin_doctor/admin_doctor_screen.dart';
 import 'admin_service/admin_service_screen.dart';
-
+import 'admin_user_screen.dart';
 // ----------------------------------------------------
 // 1. Màn hình chính Admin Home
 // ----------------------------------------------------
@@ -72,7 +72,11 @@ class _AdminDashboardHomeState extends State<_AdminDashboardHome> {
         'title': 'Quản lý Bác sĩ',
          'icon': Icons.medical_services,
           'body':const AdminDoctorScreen()},
-      {'title': 'Quản lý Người dùng', 'icon': Icons.people, 'body': PlaceholderScreen.create('Quản lý Người dùng', Colors.orange)},
+      {
+  'title': 'Quản lý Người dùng',
+  'icon': Icons.people,
+  'body': const AdminUserScreen()
+},
 
       
       {'title': 'Quản lý Dịch vụ/Gói khám',
