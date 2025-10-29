@@ -1,19 +1,14 @@
-// File: screens/appointment/book_new_appointment_screen.dart
-
 import 'package:flutter/material.dart';
-import '../../models/doctor.dart';
-import '../home/details_screen.dart'; // Import để có thể sử dụng BookingDetails
+import '../../models/doctors.dart'; // API model (Doctors)
+import '../../models/specialty.dart';
+import '../../services/specialty.dart';
+import '../../services/doctor.dart';
+import '../home/details_screen.dart'; // nếu DetailsScreen trước đó nhận Doctor (UI model), bạn cần cập nhật DetailsScreen để chấp nhận Doctors
 
-// ----------------------------------------------------
-// 1. MÀN HÌNH ĐẶT LỊCH HẸN MỚI
-// ----------------------------------------------------
 class BookNewAppointmentScreen extends StatefulWidget {
-  final void Function(Doctor, BookingDetails) onBookAppointment;
+  final void Function(Doctors, BookingDetails) onBookAppointment;
 
-  const BookNewAppointmentScreen({
-    super.key,
-    required this.onBookAppointment,
-  });
+  const BookNewAppointmentScreen({super.key, required this.onBookAppointment});
 
   @override
   State<BookNewAppointmentScreen> createState() =>
@@ -21,202 +16,270 @@ class BookNewAppointmentScreen extends StatefulWidget {
 }
 
 class _BookNewAppointmentScreenState extends State<BookNewAppointmentScreen> {
-  final List<Doctor> allDoctors = Doctor.getDoctors();
-  String? _selectedSpecialty;
+  // list of API Doctors
+  List<Doctors> allDoctors = [];
+  String? _selectedSpecialty; // specialty id selected
 
-  void _selectSpecialty(String specialty) {
+  // specialties
+  List<Specialty> _specialties = [];
+  bool _isLoadingSpecialities = true;
+  String? _specialityError;
+
+  // doctors loading state
+  bool _isLoadingDoctors = true;
+  String? _doctorsError;
+
+  late final SpecialityService _specialityService;
+  late final DoctorService _doctorService;
+
+  @override
+  void initState() {
+    super.initState();
+    _specialityService = SpecialityService();
+    _doctorService = DoctorService.instance;
+    _loadAll();
+  }
+
+  Future<void> _loadAll() async {
     setState(() {
-      _selectedSpecialty = (_selectedSpecialty == specialty) ? null : specialty;
+      _isLoadingSpecialities = true;
+      _specialityError = null;
+      _isLoadingDoctors = true;
+      _doctorsError = null;
+    });
+
+    // run both in parallel
+    await Future.wait([_loadSpecialities(), _loadDoctors()]);
+  }
+
+  Future<void> _loadSpecialities() async {
+    setState(() {
+      _isLoadingSpecialities = true;
+      _specialityError = null;
+    });
+    try {
+      final list = await _specialityService.ListSpecialty();
+      if (!mounted) return;
+      setState(() => _specialties = list);
+    } catch (e) {
+      if (!mounted) return;
+      setState(
+        () => _specialityError = e.toString().replaceFirst('Exception: ', ''),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() => _isLoadingSpecialities = false);
+    }
+  }
+
+  Future<void> _loadDoctors() async {
+    setState(() {
+      _isLoadingDoctors = true;
+      _doctorsError = null;
+    });
+    try {
+      // fetch from API (returns List<Doctors>)
+      final apiDoctors = await _doctorService.fetchDoctors();
+      if (!mounted) return;
+
+      // Keep API model directly
+      setState(() => allDoctors = apiDoctors);
+    } catch (e) {
+      if (!mounted) return;
+      setState(
+        () => _doctorsError = e.toString().replaceFirst('Exception: ', ''),
+      );
+    } finally {
+      if (!mounted) return;
+      setState(() => _isLoadingDoctors = false);
+    }
+  }
+
+  void _selectSpecialty(String id) {
+    setState(() {
+      _selectedSpecialty = (_selectedSpecialty == id) ? null : id;
     });
   }
 
-  List<Doctor> get _filteredDoctors {
+  // Filter doctors by selected specialty (compare by id or name)
+  List<Doctors> get _filteredDoctors {
     if (_selectedSpecialty == null) {
       return allDoctors;
     }
-    return allDoctors
-        .where((doctor) => doctor.specialty == _selectedSpecialty)
-        .toList();
+    return allDoctors.where((doctor) {
+      final docSpec = (doctor.specialtyName ?? '').toString();
+      // match by specialty id if API doctor had specialtyId stored in specialtyName (unlikely)
+      if (docSpec == _selectedSpecialty) return true;
+
+      // match by name using loaded _specialties map
+      final selected = _specialties.firstWhere(
+        (s) => s.id == _selectedSpecialty,
+        orElse: () => Specialty(id: '', name: '', iconKey: ''),
+      );
+      if (selected.name != null &&
+          selected.name!.isNotEmpty &&
+          docSpec.toLowerCase() == selected.name!.toLowerCase()) {
+        return true;
+      }
+
+      // fallback: direct compare doctor's specialtyName with selected.name
+      if (docSpec.toLowerCase() == (selected.name ?? '').toLowerCase()) return true;
+      return false;
+    }).toList();
   }
 
-  // Cập nhật tên chuyên khoa để xuống dòng đẹp hơn
-  final List<Map<String, dynamic>> categories = const [
-    {'name': 'Nhi khoa', 'icon': Icons.child_care},
-    {'name': 'Mắt', 'icon': Icons.remove_red_eye},
-    {'name': 'Tai Mũi Họng', 'icon': Icons.hearing},
-    {'name': 'Da Liễu', 'icon': Icons.self_improvement},
-    {'name': 'Tim mạch', 'icon': Icons.favorite},
-    {'name': 'Thần kinh', 'icon': Icons.psychology},
-    {'name': 'Cơ xương khớp', 'icon': Icons.accessible_forward},
-    {'name': 'Hô hấp', 'icon': Icons.air},
-    {'name': 'Nội tiết', 'icon': Icons.medical_services},
-    {'name': 'Sản phụ khoa', 'icon': Icons.pregnant_woman},
-  ];
-
-  // ✨ WIDGET ĐÃ ĐƯỢC CẬP NHẬT LẠI THÀNH GRIDVIEW CÓ THỂ CUỘN DỌC
-  Widget _buildCategoryGrid() {
-    // Chiều cao ước tính của một mục trong lưới
-    const double itemHeight = 110.0;
-    // Khoảng cách giữa các mục
-    const double spacing = 12.0;
-    // Chiều cao của container để hiển thị đúng 2 dòng
-    const double containerHeight = (2 * itemHeight) + spacing;
-
-    return SizedBox(
-      height: containerHeight,
-      child: GridView.builder(
-        // Cho phép cuộn dọc nếu nội dung vượt quá chiều cao
-        physics: const BouncingScrollPhysics(),
-        itemCount: categories.length,
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 4,      // 4 mục trên một hàng
-          childAspectRatio: 0.75, // Điều chỉnh tỉ lệ (rộng/cao) cho cân đối
-          crossAxisSpacing: spacing,
-          mainAxisSpacing: spacing,
-        ),
-        itemBuilder: (context, index) {
-          final category = categories[index];
-          final categoryName = category['name'] as String;
-          final isSelected = _selectedSpecialty == categoryName;
-
-          return InkWell(
-            onTap: () => _selectSpecialty(categoryName),
-            borderRadius: BorderRadius.circular(12),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: isSelected ? Colors.blue.shade700 : Colors.blue.withOpacity(0.1),
-                  child: Icon(
-                    category['icon'] as IconData,
-                    color: isSelected ? Colors.white : Colors.blue.shade700,
-                    size: 30,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  categoryName,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected ? Colors.blue.shade800 : Colors.black87,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
+  IconData iconFromKey(String? rawKey) {
+    if (rawKey == null || rawKey.trim().isEmpty) return Icons.medical_services;
+    final key = rawKey.trim().toLowerCase().replaceAll(' ', '_');
+    const Map<String, IconData> iconMap = {
+      'child_care': Icons.child_care,
+      'remove_red_eye': Icons.remove_red_eye,
+      'hearing': Icons.hearing,
+      'self_improvement': Icons.self_improvement,
+      'favorite': Icons.favorite,
+      'psychology': Icons.psychology,
+      'accessible_forward': Icons.accessible_forward,
+      'air': Icons.air,
+      'medical_services': Icons.medical_services,
+      'pregnant_woman': Icons.pregnant_woman,
+    };
+    if (iconMap.containsKey(key)) return iconMap[key]!;
+    for (final entry in iconMap.entries) {
+      if (key.contains(entry.key) || entry.key.contains(key)) return entry.value;
+    }
+    return Icons.medical_services;
   }
-
 
   @override
   Widget build(BuildContext context) {
+    // show combined loading if either specialties or doctors loading
+    final isLoading = _isLoadingSpecialities || _isLoadingDoctors;
+
     return Scaffold(
-      backgroundColor: Colors.white, // Đổi màu nền cho sạch sẽ
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Chọn Bác sĩ để Đặt lịch'),
         backgroundColor: Colors.blue.shade800,
         foregroundColor: Colors.white,
         elevation: 0,
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Phần chọn chuyên khoa
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                    const Text(
-                    'Chọn Chuyên khoa',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
-                  ),
-                  const SizedBox(height: 16),
-                  _buildCategoryGrid(),
-                ],
-              ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // header
+          const Padding(
+            padding: EdgeInsets.all(16.0),
+            child: Text(
+              'Chọn Chuyên khoa',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87),
             ),
-            
-            // Dải phân cách
-            Container(height: 8, color: Colors.grey[100]),
-            
-            // Phần danh sách bác sĩ
-            Padding(
-               padding: const EdgeInsets.all(16.0),
-              child: Column(
-                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                   Padding(
-                      padding: const EdgeInsets.only(bottom: 16.0),
-                      child: Text(
-                        _selectedSpecialty == null
-                            ? 'Danh sách Bác sĩ'
-                            : 'Bác sĩ chuyên khoa: $_selectedSpecialty',
-                        style:
-                            const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
-                      ),
-                    ),
+          ),
 
-                    if (_filteredDoctors.isEmpty)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(vertical: 40.0),
-                          child: Text('Không tìm thấy bác sĩ nào thuộc chuyên khoa này.'),
+          // specialties area
+          if (_isLoadingSpecialities) ...[
+            const SizedBox(height: 140, child: Center(child: CircularProgressIndicator())),
+          ] else if (_specialityError != null) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16.0),
+              child: Column(children: [
+                Container(
+                  height: 120,
+                  decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(12)),
+                  child: Center(child: Text('Không thể tải chuyên khoa. Vui lòng thử lại.\n${_specialityError!}', textAlign: TextAlign.center, style: TextStyle(color: Colors.grey[700]))),
+                ),
+                const SizedBox(height: 8),
+                ElevatedButton.icon(onPressed: _loadSpecialities, icon: const Icon(Icons.refresh), label: const Text('Thử lại')),
+              ]),
+            ),
+          ] else if (_specialties.isEmpty) ...[
+            const SizedBox(height: 120, child: Center(child: Text('Hiện chưa có chuyên khoa nào.'))),
+          ] else ...[
+            // Grid of specialties
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: GridView.count(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1,
+                  children: _specialties.map((s) {
+                    final name = s.name ?? '';
+                    final id = s.id;
+                    final isSelected = _selectedSpecialty == id;
+                    final icon = iconFromKey(s.iconKey ?? s.name);
+
+                    return InkWell(
+                      onTap: () => _selectSpecialty(id),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: isSelected ? Colors.blue.shade700 : Colors.blue.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: isSelected ? Colors.blue.shade800 : Colors.transparent, width: 1.2),
                         ),
-                      )
-                    else
-                      ListView.separated(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        itemCount: _filteredDoctors.length,
-                        separatorBuilder: (context, index) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) {
-                           return DoctorCard(
-                              doctor: _filteredDoctors[index],
-                              onBookAppointment: widget.onBookAppointment,
-                            );
-                        },
+                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                          Icon(icon, color: isSelected ? Colors.white : Colors.blue.shade700, size: 30),
+                          const SizedBox(height: 6),
+                          Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: Text(name, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: isSelected ? Colors.white : Colors.blue.shade900, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal))),
+                        ]),
                       ),
-                ],
+                    );
+                  }).toList(),
+                ),
               ),
             ),
           ],
-        ),
+
+          Container(height: 8, color: Colors.grey[100]),
+          const Padding(padding: EdgeInsets.all(16.0), child: Text('Chọn Bác Sĩ', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black87))),
+
+          // doctors list area
+          Expanded(
+            flex: 3,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: _isLoadingDoctors
+                  ? const Center(child: CircularProgressIndicator())
+                  : (_doctorsError != null)
+                      ? Center(child: Text('Lỗi khi tải bác sĩ: $_doctorsError'))
+                      : _filteredDoctors.isEmpty
+                          ? const Center(child: Text('Không tìm thấy bác sĩ nào thuộc chuyên khoa này.', style: TextStyle(color: Colors.black54)))
+                          : ListView.separated(
+                              itemCount: _filteredDoctors.length,
+                              separatorBuilder: (context, index) => const SizedBox(height: 12),
+                              itemBuilder: (context, index) {
+                                return DoctorCard(doctor: _filteredDoctors[index], onBookAppointment: widget.onBookAppointment);
+                              },
+                            ),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-// =======================================================================
-// DOCTOR CARD WIDGET (Không thay đổi)
-// =======================================================================
+// ============================================================
+// DOCTOR CARD (API model Doctors)
+// ============================================================
 
 class DoctorCard extends StatelessWidget {
-  final Doctor doctor;
-  final void Function(Doctor, BookingDetails) onBookAppointment;
+  final Doctors doctor;
+  final void Function(Doctors, BookingDetails) onBookAppointment;
 
-  const DoctorCard({
-    super.key,
-    required this.doctor,
-    required this.onBookAppointment,
-  });
+  const DoctorCard({super.key, required this.doctor, required this.onBookAppointment});
 
   @override
   Widget build(BuildContext context) {
+    final displayName = doctor.fullName ?? doctor.id ?? '';
+    final avatarUrl = (doctor.avatarUrl != null && doctor.avatarUrl!.isNotEmpty) ? doctor.avatarUrl : null;
+
     return Card(
       elevation: 2,
       shadowColor: Colors.black12,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
@@ -224,8 +287,11 @@ class DoctorCard extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => DetailsScreen(
-                doctor: doctor,
-                onBookAppointment: onBookAppointment,
+                doctor: doctor, 
+                onBookAppointment: (bookingDoctor, bookingDetails) {
+                  // propagate callback with API model
+                  onBookAppointment(bookingDoctor as Doctors, bookingDetails);
+                },
               ),
             ),
           );
@@ -235,56 +301,36 @@ class DoctorCard extends StatelessWidget {
           child: Row(
             children: [
               ClipOval(
-                child: Image.network(
-                  doctor.image,
-                  width: 65,
-                  height: 65,
-                  fit: BoxFit.cover,
-                ),
+                child: avatarUrl != null
+                    ? Image.network(
+                        avatarUrl,
+                        width: 65,
+                        height: 65,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => _avatarPlaceholder(65, displayName),
+                      )
+                    : _avatarPlaceholder(65, displayName),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      doctor.name,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0D47A1),
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      doctor.specialty,
-                      style: const TextStyle(
-                        fontSize: 15,
-                        color: Colors.blue,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      doctor.hospital,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: Colors.black54,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(displayName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1))),
+                  const SizedBox(height: 4),
+                  Text(doctor.specialtyName ?? '', style: const TextStyle(fontSize: 15, color: Colors.blue)),
+                  const SizedBox(height: 4),
+                  Text(doctor.hospital ?? '', style: const TextStyle(fontSize: 14, color: Colors.black54), maxLines: 1, overflow: TextOverflow.ellipsis),
+                ]),
               ),
-              const Icon(
-                Icons.arrow_forward_ios,
-                size: 18,
-                color: Colors.blue,
-              ),
+              const Icon(Icons.arrow_forward_ios, size: 18, color: Colors.blue),
             ],
           ),
         ),
       ),
     );
+  }
+
+  Widget _avatarPlaceholder(double size, String name) {
+    final initials = name.trim().isEmpty ? '?' : name.trim().split(RegExp(r'\s+')).map((s) => s.isNotEmpty ? s[0] : '').take(2).join().toUpperCase();
+    return Container(width: size, height: size, color: Colors.grey.shade200, child: Center(child: Text(initials, style: TextStyle(fontSize: size / 3, color: Colors.blue.shade700))));
   }
 }

@@ -18,10 +18,11 @@ dependencies:
   uuid: ^4.5.1
   google_maps_flutter: ^2.2.1
   geolocator: ^9.0.2  
-  # Thư viện cho định dạng tiền tệ (cần thiết cho formattedPrice trong model)
-  # Nếu bạn đã cài đặt thư viện này ở đâu đó, không cần thêm, 
-  # nếu không, bạn nên thêm 'intl' để dùng NumberFormat
-  intl: ^0.19.0 # Thêm intl nếu bạn dùng NumberFormat trong model
+  intl: ^0.19.0 
+  shared_preferences: ^2.5.3
+  firebase_core: ^4.2.0
+  google_sign_in: ^7.2.0
+  firebase_auth: ^6.1.1
 
 dev_dependencies:
   flutter_test:

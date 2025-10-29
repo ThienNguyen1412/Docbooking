@@ -1,11 +1,9 @@
-// File: dashboard_screen.dart
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'home/home_screen.dart';
 import 'home/details_screen.dart';
 import 'profile/profile_screen.dart';
-import '../models/doctor.dart';
+import '../models/doctors.dart'; // <-- dùng API model Doctors
 import '../models/notification.dart';
 import 'news/news_screen.dart';
 import 'appointment/appointment_screen.dart';
@@ -47,19 +45,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _notifications.add(notification);
     });
     if (notification.title.contains('dịch vụ')) {
-    // Nếu là thông báo dịch vụ, chuyển về tab Dịch vụ (index 2)
-    _onItemTapped(2); 
-  } else if (notification.title.contains('đặt lịch')) {
-    // Nếu là thông báo đặt bác sĩ, chuyển về tab Lịch hẹn (index 1)
-    _onItemTapped(1);
-  }
+      // Nếu là thông báo dịch vụ, chuyển về tab Dịch vụ (index 2)
+      _onItemTapped(2);
+    } else if (notification.title.contains('đặt lịch')) {
+      // Nếu là thông báo đặt bác sĩ, chuyển về tab Lịch hẹn (index 1)
+      _onItemTapped(1);
+    }
   }
 
-  void _addAppointment(Doctor doctor, BookingDetails details) {
+  // NOTE: Use API model Doctors (not UI model Doctor)
+  void _addAppointment(Doctors doctor, BookingDetails details) {
     final newAppointment = model.Appointment(
       id: 'appt${_nextAppointmentId++}',
-      doctorName: doctor.name,
-      specialty: doctor.specialty,
+      doctorName: doctor.fullName ?? doctor.id,
+      specialty: doctor.specialtyName ?? '',
       date: DateFormat('dd/MM/yyyy').format(details.date),
       time: details.time.format(context),
       status: 'Pending',
@@ -74,11 +73,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
-  void _addNotificationForAppointment(Doctor doctor, BookingDetails details) {
+  void _addNotificationForAppointment(Doctors doctor, BookingDetails details) {
     final newNotification = AppNotification(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: 'Yêu cầu đặt lịch đã được gửi!',
-      body: 'Yêu cầu đặt lịch với BS ${doctor.name} đang chờ xác nhận.',
+      body: 'Yêu cầu đặt lịch với ${doctor.fullName ?? doctor.id} đang chờ xác nhận.',
       date: DateTime.now(),
       isRead: false,
     );
@@ -86,16 +85,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       _notifications.add(newNotification);
     });
+
+    // add appointment entry
     _addAppointment(doctor, details);
 
+    // Navigate to appointments tab and show a single snack
     _onItemTapped(1);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✅ Yêu cầu đặt lịch đã gửi đi. Vui lòng chờ xác nhận.')),
-    );
-    _onItemTapped(2);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('✅ Yêu cầu đặt lịch dịch vụ đã gửi đi. Vui lòng chờ xác nhận.')),
-    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('✅ Yêu cầu đặt lịch đã gửi đi. Vui lòng chờ xác nhận.')),
+      );
+    }
   }
 
   // ✨ **1. ĐỔI TÊN HÀM VÀ THAY ĐỔI LOGIC**
@@ -108,8 +108,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       SnackBar(content: Text('Đã hủy lịch hẹn với ${appt.doctorName}')),
     );
   }
-  
-  // (Hàm _deleteAppointment cũ đã được thay thế bằng _cancelAppointment)
 
   void _updateAppointmentState(model.Appointment updatedAppointment) {
     setState(() {
@@ -139,11 +137,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
       HomeScreen(
         notifications: _notifications,
         markNotificationAsRead: _markNotificationAsRead,
+        // pass callback expecting (Doctors, BookingDetails)
         onBookAppointment: (doctor, details) => _addNotificationForAppointment(doctor, details),
       ),
       AppointmentScreen(
         appointments: MockDatabase.instance.appointments,
-        // ✨ **2. TRUYỀN HÀM MỚI VÀO THAM SỐ `onDelete`**
         // Mặc dù tên tham số là onDelete, nó sẽ thực hiện logic hủy của chúng ta.
         onDelete: _cancelAppointment,
         onEdit: _editAppointment,

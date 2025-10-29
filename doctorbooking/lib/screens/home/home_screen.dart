@@ -1,12 +1,10 @@
-// File: screens/home/home_screen.dart
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../models/notification.dart';
 import '../notification/notification_screen.dart';
 
-// ✨ THÊM CÁC IMPORT CẦN THIẾT
-import '../../models/doctor.dart';
+// ✨ SỬA: dùng API model Doctors thay vì mẫu Doctor
+import '../../models/doctors.dart'; // <-- đổi ở đây
 import '../appointment/book_new_appointment_screen.dart';
 import 'details_screen.dart'; // Import để có thể sử dụng BookingDetails
 import 'lookup/lookup_results_screen.dart';
@@ -14,7 +12,9 @@ import 'guide/guide_screen.dart';
 import 'vaccine/vaccine_booking_screen.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
-
+// ✨ IMPORT AUTH SERVICE VÀ USER MODEL
+import '../../services/auth.dart';
+import '../../models/user.dart';
 
 // Dữ liệu cho các mục trong lưới tính năng
 class FeatureItem {
@@ -27,14 +27,14 @@ class FeatureItem {
 class HomeScreen extends StatefulWidget {
   final List<AppNotification> notifications;
   final Function(String) markNotificationAsRead;
-  // ✨ SỬA LỖI: Cập nhật lại chữ ký hàm để nhận cả BookingDetails
-  final void Function(Doctor, BookingDetails) onBookAppointment;
+  // ✨ SỬA LỖI: Cập nhật lại chữ ký hàm để nhận API model Doctors
+  final void Function(Doctors, BookingDetails) onBookAppointment;
 
   const HomeScreen({
     super.key,
     required this.notifications,
     required this.markNotificationAsRead,
-    required this.onBookAppointment, // Cập nhật constructor
+    required this.onBookAppointment,
   });
 
   @override
@@ -46,6 +46,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _bannerTimer;
   int _currentPage = 0;
 
+  // ✨ TRẠNG THÁI CHO USER NAME VÀ INITIALS
+  String _userName = '';
+  String _userInitials = '';
 
   final List<String> _bannerImages = [
     'https://cdn.phenikaamec.com/phenikaa-mec/image/5-14-2025/6d9f06a3-13cb-4b9a-97a8-84b7b51c9eff-image.webp',
@@ -72,8 +75,50 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     _pageController = PageController(initialPage: 0);
     _startBannerTimer();
+
+    // ✨ TẢI TÊN NGƯỜI DÙNG TỪ TOKEN/SHARED PREFERENCES
+    _loadUserFromAuth();
   }
 
+  Future<void> _loadUserFromAuth() async {
+    try {
+      final User? user = await AuthService.instance.getUser();
+      if (!mounted) return;
+      if (user != null) {
+        // Sử dụng fullName nếu có, fallback sang email hoặc id
+        final name = (user.fullName.isNotEmpty) ? user.fullName : (user.email.isNotEmpty ? user.email : 'Người dùng');
+        setState(() {
+          _userName = name;
+          _userInitials = _getInitials(name);
+        });
+      } else {
+        // Chưa đăng nhập -> giữ mặc định rỗng hoặc "Khách"
+        setState(() {
+          _userName = '';
+          _userInitials = '';
+        });
+      }
+    } catch (e) {
+      // Nếu parse lỗi, không crash UI, giữ mặc định
+      if (!mounted) return;
+      setState(() {
+        _userName = '';
+        _userInitials = '';
+      });
+    }
+  }
+
+  String _getInitials(String fullName) {
+    if (fullName.trim().isEmpty) return '';
+    final parts = fullName.trim().split(RegExp(r'\s+'));
+    if (parts.length == 1) {
+      return parts[0].substring(0, 1).toUpperCase();
+    } else {
+      final first = parts.first.substring(0, 1);
+      final last = parts.last.substring(0, 1);
+      return (first + last).toUpperCase();
+    }
+  }
 
   @override
   void dispose() {
@@ -138,8 +183,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     itemCount: features.length,
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 3,
-                      childAspectRatio: 1.1,
-                      mainAxisSpacing: 16,
+                      childAspectRatio: 1.0,
+                      mainAxisSpacing: 8,
                       crossAxisSpacing: 8,
                     ),
                     itemBuilder: (context, index) {
@@ -155,22 +200,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                             );
-                            } else if (feature.id == 'lookup_results') {
-                            // THÊM LOGIC MỚI CHO 'lookup_results'
+                          } else if (feature.id == 'lookup_results') {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => const LookupResultsScreen(),
                               ),
                             );
-                            } else if (feature.id == 'guide') {
+                          } else if (feature.id == 'guide') {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => const GuideScreen(),
                               ),
                             );
-                            } else if (feature.id == 'vaccine') {
+                          } else if (feature.id == 'vaccine') {
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -206,12 +250,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
               _buildPartnershipBanner(),
 
-             // ✨ --- THAY THẾ PHẦN GOOGLE MAP TẠI ĐÂY --- ✨
               const SizedBox(height: 24),
               const Padding(
                 padding: EdgeInsets.only(left: 4.0),
                 child: Text(
-                  'VỊ TRÍ BỆNH VIỆN', // Đổi tiêu đề
+                  'VỊ TRÍ BỆNH VIỆN',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
@@ -220,58 +263,54 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               const SizedBox(height: 16),
-              _buildGoogleMap(), // ✨ Thêm widget bản đồ
-              // ✨ --- KẾT THÚC PHẦN THÊM MỚI --- ✨
-
+              _buildGoogleMap(),
             ],
           ),
         ),
       ),
     );
   }
-// ✨ --- CẬP NHẬT WIDGET GOOGLE MAP --- ✨
+
   Widget _buildGoogleMap() {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      clipBehavior: Clip.antiAlias, // Để bo góc cả bản đồ bên trong
+      clipBehavior: Clip.antiAlias,
       child: SizedBox(
-        height: 200, // Đặt chiều cao cố định cho bản đồ
+        height: 200,
         child: GoogleMap(
           initialCameraPosition: CameraPosition(
-            target: _hospitalLocation, // Vẫn giữ vị trí ban đầu là BV 115
-            zoom: 16.0, // Zoom vào Bệnh viện
+            target: _hospitalLocation,
+            zoom: 16.0,
           ),
-          markers: _markers, // Truyền Set<Marker> vào đây
-          // ✨ DI CHUYỂN VIỆC THÊM MARKER VÀO ĐÂY ✨
+          markers: _markers,
           onMapCreated: (GoogleMapController controller) {
             _mapController = controller;
-            // Thêm marker sau khi map đã được tạo
-            if (mounted) { // Luôn kiểm tra mounted trước khi gọi setState
-              setState(() { // Cập nhật state để rebuild widget với marker mới
+            if (mounted) {
+              setState(() {
                 _markers.add(
                   Marker(
                     markerId: const MarkerId('hospitalLocation'),
                     position: _hospitalLocation,
-                    // InfoWindow sẽ tự động hiện khi nhấn marker
                     infoWindow: const InfoWindow(title: 'Bệnh viện Nhân dân 115'),
                   ),
                 );
               });
             }
           },
-          myLocationEnabled: false, // Tắt hiển thị vị trí của tôi
-          myLocationButtonEnabled: false, // Tắt nút "về vị trí của tôi"
+          myLocationEnabled: false,
+          myLocationButtonEnabled: false,
           scrollGesturesEnabled: false,
           zoomGesturesEnabled: false,
         ),
       ),
     );
   }
+
   Widget _buildHeaderContent(BuildContext context) {
     final unreadCount = widget.notifications.where((n) => !n.isRead).length;
-    const userName = 'THIEN';
-
+    final displayedName = _userName.isNotEmpty ? _userName : 'Khách';
+    String avatarUrl = 'https://img.lovepik.com/free-png/20220101/lovepik-tortoise-png-image_401154498_wh860.png';
     String getGreeting() {
       final hour = DateTime.now().hour;
       if (hour < 12) return 'Chào buổi sáng';
@@ -286,53 +325,30 @@ class _HomeScreenState extends State<HomeScreen> {
       titleSpacing: 16,
       title: Row(
         children: [
-          const CircleAvatar(
-            radius: 20,
-            backgroundColor: Colors.blue,
-            child: Text('NT', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
+          CircleAvatar(radius: 20, backgroundImage: NetworkImage(avatarUrl)),
           const SizedBox(width: 12),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(
-                getGreeting(),
-                style: const TextStyle(fontSize: 12, color: Colors.white70),
-              ),
-              const Text(
-                userName,
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-              ),
+              Text(getGreeting(), style: const TextStyle(fontSize: 12, color: Colors.white70)),
+              Text(displayedName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
             ],
           ),
           const Icon(Icons.keyboard_arrow_right, color: Colors.white70),
         ],
       ),
       actions: [
-        IconButton(
-          onPressed: () {},
-          icon: const Icon(Icons.star_border_purple500_outlined, color: Colors.white),
-        ),
+        IconButton(onPressed: () {}, icon: const Icon(Icons.star_border_purple500_outlined, color: Colors.white)),
         Stack(
           alignment: Alignment.center,
           children: [
-            IconButton(
-              icon: const Icon(Icons.notifications_none, color: Colors.white),
-              onPressed: () => _showNotificationBottomSheet(context),
-            ),
+            IconButton(icon: const Icon(Icons.notifications_none, color: Colors.white), onPressed: () => _showNotificationBottomSheet(context)),
             if (unreadCount > 0)
               Positioned(
                 top: 12,
                 right: 12,
-                child: Container(
-                  height: 8,
-                  width: 8,
-                  decoration: const BoxDecoration(
-                    color: Colors.redAccent,
-                    shape: BoxShape.circle,
-                  ),
-                ),
+                child: Container(height: 8, width: 8, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle)),
               ),
           ],
         ),
@@ -353,10 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
           filled: true,
           fillColor: Colors.white,
           contentPadding: const EdgeInsets.symmetric(vertical: 0),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(30),
-            borderSide: BorderSide.none,
-          ),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
         ),
       ),
     );
@@ -368,22 +381,15 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         Container(
           padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
-          ),
+          decoration: BoxDecoration(color: Colors.blue.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
           child: Icon(item.icon, color: Colors.blue.shade700, size: 28),
         ),
         const SizedBox(height: 8),
-        Text(
-          item.label,
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 12, height: 1.2),
-        ),
+        Text(item.label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, height: 1.2)),
       ],
     );
   }
-  
+
   Widget _buildPartnershipBanner() {
     return Card(
       elevation: 2,
@@ -404,12 +410,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 return Image.network(
                   _bannerImages[index],
                   fit: BoxFit.cover,
-                   errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.grey[300],
-                        child: const Center(child: Icon(Icons.image_not_supported, color: Colors.grey)),
-                      );
-                    },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(color: Colors.grey[300], child: const Center(child: Icon(Icons.image_not_supported, color: Colors.grey)));
+                  },
                 );
               },
             ),
@@ -424,12 +427,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   margin: const EdgeInsets.symmetric(horizontal: 4.0),
                   height: 8.0,
                   width: _currentPage == index ? 24.0 : 8.0,
-                  decoration: BoxDecoration(
-                    color: _currentPage == index
-                        ? Colors.white
-                        : Colors.white.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  decoration: BoxDecoration(color: _currentPage == index ? Colors.white : Colors.white.withOpacity(0.5), borderRadius: BorderRadius.circular(12)),
                 );
               }),
             ),
@@ -438,10 +436,9 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-  
+
   void _showNotificationBottomSheet(BuildContext context) {
-    final sortedNotifications = List<AppNotification>.from(widget.notifications)
-      ..sort((a, b) => b.date.compareTo(a.date));
+    final sortedNotifications = List<AppNotification>.from(widget.notifications)..sort((a, b) => b.date.compareTo(a.date));
 
     showModalBottomSheet(
       context: context,
@@ -452,56 +449,26 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: const EdgeInsets.all(16.0),
           child: Column(
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('Thông Báo Của Bạn',
-                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  IconButton(
-                    icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
+              Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+                const Text('Thông Báo Của Bạn', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
+              ]),
               const Divider(),
               Expanded(
                 child: sortedNotifications.isEmpty
-                    ? const Center(
-                        child: Text('Không có thông báo mới.',
-                            style: TextStyle(color: Colors.grey)))
+                    ? const Center(child: Text('Không có thông báo mới.', style: TextStyle(color: Colors.grey)))
                     : ListView.builder(
                         itemCount: sortedNotifications.length,
                         itemBuilder: (context, index) {
                           final notification = sortedNotifications[index];
                           return ListTile(
-                            leading: Icon(
-                              notification.isRead
-                                  ? Icons.notifications_none
-                                  : Icons.notifications_active,
-                              color: notification.isRead ? Colors.grey : Colors.red,
-                            ),
-                            title: Text(
-                              notification.title,
-                              style: TextStyle(
-                                  fontWeight: notification.isRead
-                                      ? FontWeight.normal
-                                      : FontWeight.bold),
-                            ),
-                            subtitle: Text(
-                              '${notification.date.day}/${notification.date.month} | ${notification.body}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                            leading: Icon(notification.isRead ? Icons.notifications_none : Icons.notifications_active, color: notification.isRead ? Colors.grey : Colors.red),
+                            title: Text(notification.title, style: TextStyle(fontWeight: notification.isRead ? FontWeight.normal : FontWeight.bold)),
+                            subtitle: Text('${notification.date.day}/${notification.date.month} | ${notification.body}', maxLines: 1, overflow: TextOverflow.ellipsis),
                             onTap: () {
                               widget.markNotificationAsRead(notification.id);
                               Navigator.pop(ctx);
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (c) => NotificationDetailScreen(
-                                      notification: notification),
-                                ),
-                              );
+                              Navigator.push(context, MaterialPageRoute(builder: (c) => NotificationDetailScreen(notification: notification)));
                             },
                           );
                         },
