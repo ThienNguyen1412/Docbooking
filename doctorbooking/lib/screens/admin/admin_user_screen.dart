@@ -224,7 +224,7 @@ class _AdminUserScreenState extends State<AdminUserScreen> {
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText:
-                        'Tìm kiếm theo tên, email, số điện thoại hoặc id...',
+                        'Tìm kiếm theo tên, email, số điện thoại...',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: value.text.isNotEmpty
                         ? IconButton(

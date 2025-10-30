@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:doctorbooking/models/doctors.dart';
+import 'package:doctorbooking/models/doctor.dart';
 import 'package:doctorbooking/models/specialty.dart';
 import 'package:doctorbooking/services/specialty.dart';
 import 'package:flutter/material.dart';
@@ -46,7 +46,7 @@ class DoctorService {
 
   /// GET /api/doctor
   /// Optionally pass specialtyId to filter on server if the backend supports it
-  Future<List<Doctors>> fetchDoctors({String? specialtyId}) async {
+  Future<List<Doctor>> fetchDoctors({String? specialtyId}) async {
     try {
       // 1) fetch specialties and build id->name map (so we can resolve specialtyId -> name)
       Map<String, String> specialityMap = {};
@@ -107,15 +107,15 @@ class DoctorService {
           throw Exception('Unexpected response format from server.');
         }
 
-        final doctors = rawList.map<Doctors>((e) {
+        final doctors = rawList.map<Doctor>((e) {
           final map = e as Map<String, dynamic>;
           // pass specialityMap so fromJson can resolve specialtyId -> name
-          return Doctors.fromJson(map, specialityMap: specialityMap);
+          return Doctor.fromJson(map, specialityMap: specialityMap);
         }).toList();
 
         return doctors;
       } else if (response.statusCode == 204) {
-        return <Doctors>[];
+        return <Doctor>[];
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized. Please log in again.');
       } else {
@@ -137,7 +137,7 @@ class DoctorService {
   }
 
   /// GET /api/doctor/{id}
-  Future<Doctors> getDoctorById(String id) async {
+  Future<Doctor> getDoctorById(String id) async {
     try {
       final headers = await _authHeaders();
       final uri = Uri.parse('$baseUrl/$id');
@@ -148,9 +148,9 @@ class DoctorService {
         final decoded = jsonDecode(response.body);
         // If API returns wrapper { data: { ... } }
         if (decoded is Map<String, dynamic> && decoded['data'] is Map) {
-          return Doctors.fromJson(decoded['data'] as Map<String, dynamic>);
+          return Doctor.fromJson(decoded['data'] as Map<String, dynamic>);
         }
-        return Doctors.fromJson(decoded as Map<String, dynamic>);
+        return Doctor.fromJson(decoded as Map<String, dynamic>);
       } else if (response.statusCode == 404) {
         throw Exception('Doctor not found.');
       } else if (response.statusCode == 401) {
@@ -169,7 +169,7 @@ class DoctorService {
 
   /// POST /api/doctor
   /// Accepts either specialtyId OR specialtyName (backend supports both per your API)
-  Future<Doctors> createDoctor({
+  Future<Doctor> createDoctor({
     required String fullName,
     String? hospital,
     String? specialtyId,
@@ -205,9 +205,9 @@ class DoctorService {
         final decoded = jsonDecode(response.body);
         // If API returns wrapper with data
         if (decoded is Map<String, dynamic> && decoded['data'] is Map) {
-          return Doctors.fromJson(decoded['data'] as Map<String, dynamic>);
+          return Doctor.fromJson(decoded['data'] as Map<String, dynamic>);
         }
-        return Doctors.fromJson(decoded as Map<String, dynamic>);
+        return Doctor.fromJson(decoded as Map<String, dynamic>);
       } else if (response.statusCode == 400) {
         final msg = _extractMessage(response.body) ?? 'Bad request';
         throw Exception(msg);
@@ -226,7 +226,7 @@ class DoctorService {
   }
 
   /// PUT /api/doctor/{id}
-  Future<Doctors> updateDoctor({
+  Future<Doctor> updateDoctor({
     required String id,
     String? fullName,
     String? hospital,
@@ -255,9 +255,9 @@ class DoctorService {
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
         if (decoded is Map<String, dynamic> && decoded['data'] is Map) {
-          return Doctors.fromJson(decoded['data'] as Map<String, dynamic>);
+          return Doctor.fromJson(decoded['data'] as Map<String, dynamic>);
         }
-        return Doctors.fromJson(decoded as Map<String, dynamic>);
+        return Doctor.fromJson(decoded as Map<String, dynamic>);
       } else if (response.statusCode == 400) {
         final msg = _extractMessage(response.body) ?? 'Bad request';
         throw Exception(msg);

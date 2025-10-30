@@ -4,7 +4,7 @@ import '../../models/notification.dart';
 import '../notification/notification_screen.dart';
 
 // ✨ SỬA: dùng API model Doctors thay vì mẫu Doctor
-import '../../models/doctors.dart'; // <-- đổi ở đây
+import '../../models/doctor.dart'; // <-- đổi ở đây
 import '../appointment/book_new_appointment_screen.dart';
 import 'details_screen.dart'; // Import để có thể sử dụng BookingDetails
 import 'lookup/lookup_results_screen.dart';
@@ -28,7 +28,7 @@ class HomeScreen extends StatefulWidget {
   final List<AppNotification> notifications;
   final Function(String) markNotificationAsRead;
   // ✨ SỬA LỖI: Cập nhật lại chữ ký hàm để nhận API model Doctors
-  final void Function(Doctors, BookingDetails) onBookAppointment;
+  final void Function(Doctor, BookingDetails) onBookAppointment;
 
   const HomeScreen({
     super.key,

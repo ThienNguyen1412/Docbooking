@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:doctorbooking/models/doctors.dart';
+import 'package:doctorbooking/models/doctor.dart';
 import 'package:doctorbooking/models/specialty.dart';
 import 'package:doctorbooking/services/specialty.dart';
 import 'package:doctorbooking/services/doctor.dart'; // adjust if your file name differs
 
 class AddEditDoctorScreen extends StatefulWidget {
-  final Doctors? doctor; // dùng model mới
+  final Doctor? doctor; // dùng model mới
 
   const AddEditDoctorScreen({super.key, this.doctor});
 
