@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:doctorbooking/models/doctors.dart';
+import 'package:doctorbooking/models/doctor.dart';
 import 'add_edit_doctor_screen.dart';
 import 'package:doctorbooking/services/doctor.dart';
 
@@ -11,7 +11,7 @@ class AdminDoctorScreen extends StatefulWidget {
 }
 
 class _AdminDoctorScreenState extends State<AdminDoctorScreen> {
-  List<Doctors> _doctors = [];
+  List<Doctor> _doctors = [];
   String _searchQuery = '';
 
   bool _isLoading = true;
@@ -49,7 +49,7 @@ class _AdminDoctorScreenState extends State<AdminDoctorScreen> {
     }
   }
 
-  List<Doctors> get _filteredDoctors {
+  List<Doctor> get _filteredDoctors {
     if (_searchQuery.isEmpty) {
       return _doctors;
     }
@@ -62,7 +62,7 @@ class _AdminDoctorScreenState extends State<AdminDoctorScreen> {
   }
 
   void _navigateAndAddDoctor(BuildContext context) async {
-    final newDoctor = await Navigator.of(context).push<Doctors>(
+    final newDoctor = await Navigator.of(context).push<Doctor>(
       MaterialPageRoute(builder: (ctx) => const AddEditDoctorScreen()),
     );
 
@@ -76,9 +76,9 @@ class _AdminDoctorScreenState extends State<AdminDoctorScreen> {
 
   void _navigateAndEditDoctor(
     BuildContext context,
-    Doctors doctorToEdit,
+    Doctor doctorToEdit,
   ) async {
-    final updatedDoctor = await Navigator.of(context).push<Doctors>(
+    final updatedDoctor = await Navigator.of(context).push<Doctor>(
       MaterialPageRoute(
         builder: (ctx) => AddEditDoctorScreen(doctor: doctorToEdit),
       ),
@@ -97,7 +97,7 @@ class _AdminDoctorScreenState extends State<AdminDoctorScreen> {
     }
   }
 
-  Future<void> _confirmAndDelete(BuildContext context, Doctors doctor) async {
+  Future<void> _confirmAndDelete(BuildContext context, Doctor doctor) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -153,7 +153,7 @@ class _AdminDoctorScreenState extends State<AdminDoctorScreen> {
       );
   }
 
-  Widget _buildAvatar(Doctors doctor) {
+  Widget _buildAvatar(Doctor doctor) {
     final avatar = doctor.avatarUrl;
     final displayName = doctor.fullName ?? '';
     final initials = displayName.isEmpty

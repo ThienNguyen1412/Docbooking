@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import '../../models/doctors.dart'; // API model (Doctors)
+import '../../models/doctor.dart'; // API model (Doctor)
 import '../../models/specialty.dart';
 import '../../services/specialty.dart';
 import '../../services/doctor.dart';
-import '../home/details_screen.dart'; // nếu DetailsScreen trước đó nhận Doctor (UI model), bạn cần cập nhật DetailsScreen để chấp nhận Doctors
+import '../home/details_screen.dart'; // nếu DetailsScreen trước đó nhận Doctor (UI model), bạn cần cập nhật DetailsScreen để chấp nhận Doctor
 
 class BookNewAppointmentScreen extends StatefulWidget {
-  final void Function(Doctors, BookingDetails) onBookAppointment;
+  final void Function(Doctor, BookingDetails) onBookAppointment;
 
   const BookNewAppointmentScreen({super.key, required this.onBookAppointment});
 
@@ -17,7 +17,7 @@ class BookNewAppointmentScreen extends StatefulWidget {
 
 class _BookNewAppointmentScreenState extends State<BookNewAppointmentScreen> {
   // list of API Doctors
-  List<Doctors> allDoctors = [];
+  List<Doctor> allDoctors = [];
   String? _selectedSpecialty; // specialty id selected
 
   // specialties
@@ -102,7 +102,7 @@ class _BookNewAppointmentScreenState extends State<BookNewAppointmentScreen> {
   }
 
   // Filter doctors by selected specialty (compare by id or name)
-  List<Doctors> get _filteredDoctors {
+  List<Doctor> get _filteredDoctors {
     if (_selectedSpecialty == null) {
       return allDoctors;
     }
@@ -262,12 +262,12 @@ class _BookNewAppointmentScreenState extends State<BookNewAppointmentScreen> {
 }
 
 // ============================================================
-// DOCTOR CARD (API model Doctors)
+
 // ============================================================
 
 class DoctorCard extends StatelessWidget {
-  final Doctors doctor;
-  final void Function(Doctors, BookingDetails) onBookAppointment;
+  final Doctor doctor;
+  final void Function(Doctor, BookingDetails) onBookAppointment;
 
   const DoctorCard({super.key, required this.doctor, required this.onBookAppointment});
 
@@ -290,7 +290,7 @@ class DoctorCard extends StatelessWidget {
                 doctor: doctor, 
                 onBookAppointment: (bookingDoctor, bookingDetails) {
                   // propagate callback with API model
-                  onBookAppointment(bookingDoctor as Doctors, bookingDetails);
+                  onBookAppointment(bookingDoctor as Doctor, bookingDetails);
                 },
               ),
             ),

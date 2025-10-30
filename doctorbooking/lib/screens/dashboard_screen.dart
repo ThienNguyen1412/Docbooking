@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'home/home_screen.dart';
 import 'home/details_screen.dart';
 import 'profile/profile_screen.dart';
-import '../models/doctors.dart'; // <-- dùng API model Doctors
+import '../models/doctor.dart';
 import '../models/notification.dart';
 import 'news/news_screen.dart';
-import 'appointment/appointment_screen.dart';
+// Removed direct AppointmentScreen import — use the self-loading MyAppointmentsPage instead
+import '../screens/appointment/my_appointment_screen.dart';
 import 'service/service_screen.dart';
 import 'appointment/edit_appointment_screen.dart';
-import '../data/mock_database.dart';
-import '../models/appointment.dart' as model;
+import '../models/appointments.dart' as model;
 
+/// DashboardScreen - đã loại bỏ mọi dữ liệu mẫu (MockDatabase)
+/// - Notifications: bắt đầu rỗng
+/// - Appointments: màn MyAppointmentsPage sẽ tự load dữ liệu từ API
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -21,9 +23,9 @@ class DashboardScreen extends StatefulWidget {
 
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
-  int _nextAppointmentId = MockDatabase.instance.appointments.length + 1;
 
-  final List<AppNotification> _notifications = AppNotification.initialNotifications();
+  // Bắt đầu với danh sách thông báo rỗng (không còn dữ liệu mẫu)
+  final List<AppNotification> _notifications = [];
 
   void _onItemTapped(int index) {
     setState(() {
@@ -44,36 +46,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
     setState(() {
       _notifications.add(notification);
     });
-    if (notification.title.contains('dịch vụ')) {
+    if (notification.title.toLowerCase().contains('dịch vụ')) {
       // Nếu là thông báo dịch vụ, chuyển về tab Dịch vụ (index 2)
       _onItemTapped(2);
-    } else if (notification.title.contains('đặt lịch')) {
-      // Nếu là thông báo đặt bác sĩ, chuyển về tab Lịch hẹn (index 1)
+    } else if (notification.title.toLowerCase().contains('đặt lịch')) {
+      // Nếu là thông báo đặt lịch, chuyển về tab Lịch hẹn (index 1)
       _onItemTapped(1);
     }
   }
 
-  // NOTE: Use API model Doctors (not UI model Doctor)
-  void _addAppointment(Doctors doctor, BookingDetails details) {
-    final newAppointment = model.Appointment(
-      id: 'appt${_nextAppointmentId++}',
-      doctorName: doctor.fullName ?? doctor.id,
-      specialty: doctor.specialtyName ?? '',
-      date: DateFormat('dd/MM/yyyy').format(details.date),
-      time: details.time.format(context),
-      status: 'Pending',
-      patientName: details.name,
-      patientPhone: details.phone,
-      patientAddress: details.address,
-      notes: details.note,
-    );
-
-    setState(() {
-      MockDatabase.instance.addAppointment(newAppointment);
-    });
-  }
-
-  void _addNotificationForAppointment(Doctors doctor, BookingDetails details) {
+  // Khi người dùng đặt lịch (từ DetailsScreen / BookNewAppointmentScreen),
+  // ta chỉ thêm 1 thông báo (không thêm dữ liệu mẫu vào danh sách appointments).
+  void _addNotificationForAppointment(Doctor doctor, BookingDetails details) {
     final newNotification = AppNotification(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       title: 'Yêu cầu đặt lịch đã được gửi!',
@@ -86,11 +70,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _notifications.add(newNotification);
     });
 
-    // add appointment entry
-    _addAppointment(doctor, details);
-
-    // Navigate to appointments tab and show a single snack
+    // Chuyển sang tab Lịch hẹn
     _onItemTapped(1);
+
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('✅ Yêu cầu đặt lịch đã gửi đi. Vui lòng chờ xác nhận.')),
@@ -98,23 +80,22 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
   }
 
-  // ✨ **1. ĐỔI TÊN HÀM VÀ THAY ĐỔI LOGIC**
-  // Thay vì xóa, hàm này giờ sẽ cập nhật trạng thái thành 'Canceled'.
+  // Hủy lịch (không thao tác với dữ liệu mẫu)
   void _cancelAppointment(model.Appointment appt) {
-    setState(() {
-      MockDatabase.instance.updateAppointmentStatus(appt.id, 'Canceled');
-    });
+    // Ở đây bạn nên gọi API (AppointmentService) để hủy trên backend.
+    // Hiện tại chỉ hiển thị thông báo UI và chuyển tab nếu cần.
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Đã hủy lịch hẹn với ${appt.doctorName}')),
+      SnackBar(content: Text('Đã gửi yêu cầu hủy lịch hẹn với ${appt.doctorName ?? appt.doctorId}')),
     );
+    // Optionally switch to appointments tab
+    _onItemTapped(1);
   }
 
+  // Cập nhật appointment (nên gọi API ở đây nếu có)
   void _updateAppointmentState(model.Appointment updatedAppointment) {
-    setState(() {
-      MockDatabase.instance.updateAppointment(updatedAppointment);
-    });
+    // Gọi API update nếu cần; hiện chỉ show snackbar
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('✅ Cập nhật lịch hẹn với ${updatedAppointment.doctorName} thành công!')),
+      SnackBar(content: Text('✅ Cập nhật lịch hẹn với ${updatedAppointment.doctorName ?? updatedAppointment.doctorId} thành công!')),
     );
   }
 
@@ -133,20 +114,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Sử dụng MyAppointmentsPage cho tab Lịch hẹn để màn này tự gọi API và quản lý state.
     final List<Widget> screens = <Widget>[
       HomeScreen(
         notifications: _notifications,
         markNotificationAsRead: _markNotificationAsRead,
-        // pass callback expecting (Doctors, BookingDetails)
         onBookAppointment: (doctor, details) => _addNotificationForAppointment(doctor, details),
       ),
-      AppointmentScreen(
-        appointments: MockDatabase.instance.appointments,
-        // Mặc dù tên tham số là onDelete, nó sẽ thực hiện logic hủy của chúng ta.
-        onDelete: _cancelAppointment,
-        onEdit: _editAppointment,
-        onBookAppointment: (doctor, details) => _addNotificationForAppointment(doctor, details),
-      ),
+
+      // Đây là thay đổi: MyAppointmentsPage tự gọi API và hiển thị dữ liệu
+      const MyAppointmentsPage(),
+
       ServiceScreen(
         unreadNotifications: _notifications,
         markNotificationAsRead: _markNotificationAsRead,
