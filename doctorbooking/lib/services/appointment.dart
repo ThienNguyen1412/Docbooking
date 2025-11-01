@@ -14,7 +14,7 @@ class AppointmentService {
       AppointmentService._privateConstructor();
 
   // Change to your backend base URL if different
-  static const String _baseUrl = 'http://192.168.111.219:5101/api/appointment';
+  static const String _baseUrl = 'https://103f6194a519.ngrok-free.app/api/appointment';
   static const Duration _timeout = Duration(seconds: 15);
 
   // Try multiple token keys for backwards compatibility

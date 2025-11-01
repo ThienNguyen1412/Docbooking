@@ -4,7 +4,7 @@ import 'package:doctorbooking/models/specialty.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SpecialityService {
-  static const String baseUrl = "http://192.168.111.219:5101/api/speciality";
+  static const String baseUrl = "https://103f6194a519.ngrok-free.app/api/speciality";
 
   Future<List<Specialty>> ListSpecialty() async {
     final url = Uri.parse('$baseUrl');

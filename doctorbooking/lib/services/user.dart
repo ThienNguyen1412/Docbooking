@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 
 class UserService {
-  static const String baseUrl = "http://192.168.111.219:5101/api/user";
+  static const String baseUrl = "https://103f6194a519.ngrok-free.app/api/user";
   static const Duration _timeout = Duration(seconds: 15);
 
   // Try multiple keys for backwards compatibility with different token keys

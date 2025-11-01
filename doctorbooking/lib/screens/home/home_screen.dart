@@ -9,7 +9,9 @@ import '../appointment/book_new_appointment_screen.dart';
 import 'details_screen.dart'; // Import để có thể sử dụng BookingDetails
 import 'lookup/lookup_results_screen.dart';
 import 'guide/guide_screen.dart';
+import 'about/about_screen.dart';
 import 'vaccine/vaccine_booking_screen.dart';
+import 'homecare/home_healthcare.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 // ✨ IMPORT AUTH SERVICE VÀ USER MODEL
@@ -29,12 +31,16 @@ class HomeScreen extends StatefulWidget {
   final Function(String) markNotificationAsRead;
   // ✨ SỬA LỖI: Cập nhật lại chữ ký hàm để nhận API model Doctors
   final void Function(Doctor, BookingDetails) onBookAppointment;
+  final VoidCallback onBookingCompleteGoToAppointments;
+  final Function(AppNotification) addNotification;
 
   const HomeScreen({
     super.key,
     required this.notifications,
     required this.markNotificationAsRead,
     required this.onBookAppointment,
+    required this.onBookingCompleteGoToAppointments,
+    required this.addNotification,
   });
 
   @override
@@ -153,8 +159,8 @@ class _HomeScreenState extends State<HomeScreen> {
       const FeatureItem(id: 'lookup_results', icon: Icons.find_in_page_outlined, label: 'Tra cứu kết quả\nkhám bệnh'),
       const FeatureItem(id: 'guide', icon: Icons.info_outline, label: 'Hướng dẫn\nđặt khám'),
       const FeatureItem(id: 'vaccine', icon: Icons.vaccines_outlined, label: 'Đặt lịch\ntiêm chủng'),
-      const FeatureItem(id: 'payment', icon: Icons.credit_card_outlined, label: 'Thanh toán\nviện phí'),
-      const FeatureItem(id: 'hotline', icon: Icons.phone_in_talk_outlined, label: 'Đặt khám\n1900-2115'),
+      const FeatureItem(id: 'about', icon: Icons.info_outline, label: 'Chi tiết về\nDocBooking'),
+     const FeatureItem(id: 'homecare', icon: Icons.medical_services_outlined, label: 'Y tế\ntại nhà'),
     ];
 
     return Scaffold(
@@ -219,6 +225,24 @@ class _HomeScreenState extends State<HomeScreen> {
                               context,
                               MaterialPageRoute(
                                 builder: (context) => const VaccineBookingScreen(),
+                              ),
+                            );
+                            } else if (feature.id == 'about') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AboutScreen(),
+                              ),
+                            );
+                            } else if (feature.id == 'homecare') {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                // ✨ BƯỚC 2: TRUYỀN 2 THAM SỐ VÀO ĐÂY
+                                builder: (context) => HomeHealthcareScreen(
+                                  addNotification: widget.addNotification,
+                                  onBookingCompleteGoToAppointments: widget.onBookingCompleteGoToAppointments,
+                                ),
                               ),
                             );
                           } else {

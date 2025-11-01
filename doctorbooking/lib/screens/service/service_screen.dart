@@ -5,11 +5,12 @@ import '../../models/notification.dart';
 import '../../models/health_package.dart'; 
 import '../notification/notification_screen.dart'; 
 import 'service_detail_screen.dart'; 
-// ✨ 1. THÊM IMPORT NÀY ĐỂ CÓ THỂ SỬ DỤNG `BookingDetails`
+// (Import 'BookingDetails' không cần thiết ở file này)
 
 
 class ServiceScreen extends StatelessWidget { 
-  // ✨ 2. CẬP NHẬT "CHỮ KÝ" (SIGNATURE) CỦA HÀM TẠI ĐÂY
+  // ✨ (MỚI) Thêm callback để nhận từ MainScreen
+  final VoidCallback onBookingCompleteGoToAppointments;
 
   final List<AppNotification> unreadNotifications; 
   final Function(String) markNotificationAsRead; 
@@ -24,6 +25,7 @@ class ServiceScreen extends StatelessWidget {
     required this.unreadNotifications, 
     required this.markNotificationAsRead, 
     required this.addNotification,
+    required this.onBookingCompleteGoToAppointments, // ✨ (MỚI) Thêm vào constructor
   });
 
 // --- Các hàm build UI (không thay đổi logic bên trong) ---
@@ -156,6 +158,8 @@ Widget _buildPackageCard(BuildContext context, HealthPackage pkg, {required Colo
           builder: (c) => ServiceDetailScreen(
             healthPackage: pkg,
             addNotification: addNotification,
+            // ✨ (MỚI) Truyền callback xuống
+            onBookingCompleteGoToAppointments: onBookingCompleteGoToAppointments, 
           ),
         ),
       );
@@ -223,6 +227,8 @@ Widget _buildPackageCard(BuildContext context, HealthPackage pkg, {required Colo
                         builder: (c) => ServiceDetailScreen(
                           healthPackage: pkg,
                           addNotification: addNotification,
+                          // ✨ (MỚI) Truyền callback xuống
+                          onBookingCompleteGoToAppointments: onBookingCompleteGoToAppointments, 
                         ),
                       ),
                     );
@@ -332,8 +338,9 @@ Widget _buildStandardPackages(BuildContext context) {
                     MaterialPageRoute(
                       builder: (c) => ServiceDetailScreen(
                         healthPackage: pkg,
-
                         addNotification: addNotification,
+                        // ✨ (MỚI) Truyền callback xuống
+                        onBookingCompleteGoToAppointments: onBookingCompleteGoToAppointments,
                       ),
                     ),
                   );

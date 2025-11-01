@@ -33,6 +33,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
     });
   }
 
+  // ======================================================
+  // === ✨ (MỚI) HÀM ĐỂ CHUYỂN TAB SAU KHI ĐẶT DỊCH VỤ ===
+  // ======================================================
+  void _goToAppointmentsTab() {
+    // 1 là index của tab 'Lịch hẹn' (MyAppointmentsPage)
+    _onItemTapped(1);
+  }
+  // ======================================================
+
   void _markNotificationAsRead(String id) {
     setState(() {
       final index = _notifications.indexWhere((noti) => noti.id == id);
@@ -120,6 +129,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
         notifications: _notifications,
         markNotificationAsRead: _markNotificationAsRead,
         onBookAppointment: (doctor, details) => _addNotificationForAppointment(doctor, details),
+        addNotification: _addNotification,
+        onBookingCompleteGoToAppointments: _goToAppointmentsTab,
       ),
 
       // Đây là thay đổi: MyAppointmentsPage tự gọi API và hiển thị dữ liệu
@@ -129,6 +140,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
         unreadNotifications: _notifications,
         markNotificationAsRead: _markNotificationAsRead,
         addNotification: _addNotification,
+        // ======================================================
+        // === ✨ (MỚI) TRUYỀN HÀM CHUYỂN TAB XUỐNG ĐÂY ===
+        onBookingCompleteGoToAppointments: _goToAppointmentsTab,
+        // ======================================================
       ),
       const NewsScreen(),
       const ProfileScreen(),

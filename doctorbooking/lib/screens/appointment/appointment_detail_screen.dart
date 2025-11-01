@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+// (MỚI) Thêm intl để format ngày
+import 'package:intl/intl.dart'; 
 import '../../models/appointments.dart' as model;
 import '../../services/appointment.dart';
 
@@ -79,12 +81,19 @@ class AppointmentDetailScreen extends StatelessWidget {
     final updated = await Navigator.push<model.Appointment>(
       context,
       MaterialPageRoute(
+        // ✨ Đảm bảo bạn gọi đúng màn hình EditAppointmentScreenShim
         builder: (ctx) => EditAppointmentScreenShim(initialAppointment: appointment),
       ),
     );
 
-    if (updated == null) return; // user cancelled or save failed
+    // Nếu 'updated' là null, nghĩa là người dùng đã nhấn back
+    // hoặc nhấn 'Lưu' khi không có gì thay đổi (nếu bạn dùng logic Cách 2)
+    // Hoặc người dùng chỉ nhấn back (nếu dùng logic Cách 1 - vô hiệu hóa nút)
+    if (updated == null) return; // user cancelled
 
+    // Chỉ khi 'updated' không null (tức là đã lưu thành công)
+    // chúng ta mới gọi onEdit và hiển thị SnackBar
+    
     // notify parent to update local list
     try {
       onEdit(updated);
@@ -93,7 +102,11 @@ class AppointmentDetailScreen extends StatelessWidget {
     // pop detail screen to go back to list
     if (Navigator.canPop(context)) Navigator.of(context).pop();
 
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cập nhật lịch hẹn thành công'), backgroundColor: Colors.green));
+    // Hiển thị SnackBar ở màn hình danh sách (sau khi pop)
+    // (Ghi chú: Đoạn code này có thể không chạy được nếu context đã bị pop,
+    // tốt hơn là nên hiển thị SnackBar ở màn hình danh sách, 
+    // giống như cách bạn làm trong _onEdit của MyAppointmentsPage)
+    // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Cập nhật lịch hẹn thành công'), backgroundColor: Colors.green));
   }
 
   // Cancel appointment as patient -> call DELETE (soft cancel) on backend
@@ -116,7 +129,9 @@ class AppointmentDetailScreen extends StatelessWidget {
       } catch (_) {}
       closeLoading();
       if (Navigator.canPop(context)) Navigator.of(context).pop(); // pop detail screen
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hủy lịch hẹn thành công'), backgroundColor: Colors.green));
+      // Hiển thị SnackBar ở màn hình danh sách (sau khi pop)
+      // (Giống như trên, nên để MyAppointmentsPage xử lý việc này)
+      // ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Hủy lịch hẹn thành công'), backgroundColor: Colors.green));
     } catch (e) {
       closeLoading();
       final msg = e.toString().replaceFirst('Exception: ', '');
@@ -278,6 +293,10 @@ class AppointmentDetailScreen extends StatelessWidget {
 }
 
 
+// ====================================================================
+// === ✨ BẮT ĐẦU SỬA LỖI LOGIC CHO EDITAPPOINTMENTSHIM ✨ ===
+// ====================================================================
+
 /// Simple shim edit screen inside this file to avoid circular imports.
 /// If you already have a dedicated edit screen, replace this with your screen.
 class EditAppointmentScreenShim extends StatefulWidget {
@@ -289,8 +308,24 @@ class EditAppointmentScreenShim extends StatefulWidget {
 }
 
 class _EditAppointmentScreenShimState extends State<EditAppointmentScreenShim> {
+  // === Dữ liệu ban đầu (để so sánh) ===
+  late DateTime _initialDate;
+  late TimeOfDay _initialTime;
+  late String _initialName;
+  late String _initialPhone;
+  late String _initialAddress;
+  late String _initialNotes;
+  // ==================================
+
+  // === Dữ liệu đã chọn (đang thay đổi) ===
   late DateTime _selectedDate;
   late TimeOfDay _selectedTime;
+  // ===================================
+
+  // === Biến cờ theo dõi thay đổi ===
+  bool _isChanged = false;
+  // ==============================
+  
   late final TextEditingController _nameController;
   late final TextEditingController _phoneController;
   late final TextEditingController _addressController;
@@ -300,27 +335,78 @@ class _EditAppointmentScreenShimState extends State<EditAppointmentScreenShim> {
   void initState() {
     super.initState();
     final a = widget.initialAppointment;
-    _selectedDate = a.appointmentDate;
+    
+    // --- 1. Lưu giá trị gốc ---
+    _initialDate = a.appointmentDate;
     final parts = (a.appointmentTime ?? '00:00').split(':');
-    _selectedTime = TimeOfDay(hour: int.tryParse(parts[0]) ?? 0, minute: int.tryParse(parts[1]) ?? 0);
-    _nameController = TextEditingController(text: a.patientFullName);
-    _phoneController = TextEditingController(text: a.phone ?? '');
-    _addressController = TextEditingController(text: a.patientAddress ?? '');
-    _notesController = TextEditingController(text: a.note ?? '');
+    _initialTime = TimeOfDay(hour: int.tryParse(parts[0]) ?? 0, minute: int.tryParse(parts[1]) ?? 0);
+    _initialName = a.patientFullName ?? '';
+    _initialPhone = a.phone ?? '';
+    _initialAddress = a.patientAddress ?? '';
+    _initialNotes = a.note ?? '';
+
+    // --- 2. Gán giá trị ban đầu cho các biến sẽ thay đổi ---
+    _selectedDate = _initialDate;
+    _selectedTime = _initialTime;
+    _nameController = TextEditingController(text: _initialName);
+    _phoneController = TextEditingController(text: _initialPhone);
+    _addressController = TextEditingController(text: _initialAddress);
+    _notesController = TextEditingController(text: _initialNotes);
+
+    // --- 3. Thêm listeners để theo dõi thay đổi ---
+    _nameController.addListener(_checkForChanges);
+    _phoneController.addListener(_checkForChanges);
+    _addressController.addListener(_checkForChanges);
+    _notesController.addListener(_checkForChanges);
+  }
+  
+  /// (MỚI) Hàm kiểm tra xem có thay đổi nào không
+  void _checkForChanges() {
+    // So sánh ngày tháng năm
+    final bool dateChanged = !DateUtils.isSameDay(_selectedDate, _initialDate);
+        
+    final bool timeChanged = _selectedTime.hour != _initialTime.hour ||
+        _selectedTime.minute != _initialTime.minute;
+
+    final bool nameChanged = _nameController.text != _initialName;
+    final bool phoneChanged = _phoneController.text != _initialPhone;
+    final bool addressChanged = _addressController.text != _initialAddress;
+    final bool notesChanged = _notesController.text != _initialNotes;
+
+    final bool hasChanged = dateChanged || timeChanged || nameChanged || phoneChanged || addressChanged || notesChanged;
+
+    // Chỉ cập nhật state nếu trạng thái thay đổi (từ true -> false hoặc ngược lại)
+    if (hasChanged != _isChanged) {
+      setState(() {
+        _isChanged = hasChanged;
+      });
+    }
   }
 
   Future<void> _pickDate() async {
-    final picked = await showDatePicker(context: context, initialDate: _selectedDate, firstDate: DateTime.now(), lastDate: DateTime(2101));
-    if (picked != null) setState(() => _selectedDate = picked);
+    final picked = await showDatePicker(context: context, initialDate: _selectedDate, firstDate: DateTime.now().subtract(const Duration(days: 30)), lastDate: DateTime(2101));
+    if (picked != null && !DateUtils.isSameDay(picked, _selectedDate)) {
+      setState(() => _selectedDate = picked);
+      _checkForChanges(); // (MỚI) Kiểm tra
+    }
   }
 
   Future<void> _pickTime() async {
     final picked = await showTimePicker(context: context, initialTime: _selectedTime);
-    if (picked != null) setState(() => _selectedTime = picked);
+    if (picked != null && (picked.hour != _selectedTime.hour || picked.minute != _selectedTime.minute)) {
+      setState(() => _selectedTime = picked);
+      _checkForChanges(); // (MỚI) Kiểm tra
+    }
   }
 
   @override
   void dispose() {
+    // (MỚI) Gỡ listeners
+    _nameController.removeListener(_checkForChanges);
+    _phoneController.removeListener(_checkForChanges);
+    _addressController.removeListener(_checkForChanges);
+    _notesController.removeListener(_checkForChanges);
+
     _nameController.dispose();
     _phoneController.dispose();
     _addressController.dispose();
@@ -334,6 +420,12 @@ class _EditAppointmentScreenShimState extends State<EditAppointmentScreenShim> {
   }
 
   Future<void> _saveChanges() async {
+    // (MỚI) Thêm kiểm tra ở đây, mặc dù nút đã bị vô hiệu hóa
+    if (!_isChanged) {
+      Navigator.of(context).pop(); // Chỉ pop, không trả về gì
+      return;
+    }
+
     final a = widget.initialAppointment;
 
     // basic validation
@@ -354,25 +446,26 @@ class _EditAppointmentScreenShimState extends State<EditAppointmentScreenShim> {
       appointmentTime: _timeOfDayToString(_selectedTime),
       patientFullName: name,
       phone: phone,
+      note: _notesController.text.trim(), // (SỬA) Cập nhật note
     );
 
     // Build DTO for API
     final dto = <String, dynamic>{
       'PatientFullName': updated.patientFullName,
       'Phone': updated.phone,
-      'AppointmentDate': '${updated.appointmentDate.year.toString().padLeft(4,'0')}-${updated.appointmentDate.month.toString().padLeft(2,'0')}-${updated.appointmentDate.day.toString().padLeft(2,'0')}',
+      'AppointmentDate': DateFormat('yyyy-MM-dd').format(updated.appointmentDate), // (SỬA) Dùng DateFormat
       'AppointmentTime': updated.appointmentTime,
-      if (updated.note != null && updated.note!.trim().isNotEmpty) 'Note': updated.note!.trim(),
+      'PatientAddress': updated.patientAddress, // (SỬA) Thêm address
+      'Note': updated.note, // (SỬA) Thêm note
     };
 
     final closeLoading = await showLoadingDialog(context, message: 'Đang lưu thay đổi...');
     try {
       await AppointmentService.instance.updateAppointment(updated.id, dto);
       closeLoading();
-      // show toast before pop to ensure ScaffoldMessenger context is valid
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Lưu thay đổi thành công'), backgroundColor: Colors.green));
-      }
+      
+      // (Bỏ SnackBar ở đây, để màn hình trước (Detail) tự hiển thị)
+      
       // Return the updated appointment to caller (detail screen)
       if (Navigator.canPop(context)) Navigator.of(context).pop(updated);
     } catch (e) {
@@ -387,26 +480,86 @@ class _EditAppointmentScreenShimState extends State<EditAppointmentScreenShim> {
   @override
   Widget build(BuildContext context) {
     final a = widget.initialAppointment;
-    final dateDisplay = '${_selectedDate.day.toString().padLeft(2,'0')}/${_selectedDate.month.toString().padLeft(2,'0')}/${_selectedDate.year}';
+    final dateDisplay = DateFormat('dd/MM/yyyy').format(_selectedDate); // (SỬA) Dùng DateFormat
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Chỉnh Sửa Lịch Hẹn'), backgroundColor: Colors.blue.shade800),
+      appBar: AppBar(title: const Text('Chỉnh Sửa Lịch Hẹn'), backgroundColor: Colors.blue.shade800,foregroundColor: Colors.white,),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(children: [
-          TextField(controller: _nameController, decoration: const InputDecoration(labelText: 'Tên bệnh nhân')),
+          // (SỬA) Thêm border cho đẹp hơn
+          TextField(
+            controller: _nameController, 
+            decoration: const InputDecoration(
+              labelText: 'Tên bệnh nhân (*)', 
+              border: OutlineInputBorder(), 
+              prefixIcon: Icon(Icons.person_outline)
+            )
+          ),
           const SizedBox(height: 12),
-          TextField(controller: _phoneController, decoration: const InputDecoration(labelText: 'Số điện thoại'), keyboardType: TextInputType.phone),
+          TextField(
+            controller: _phoneController, 
+            decoration: const InputDecoration(
+              labelText: 'Số điện thoại (*)', 
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.phone_outlined)
+            ), 
+            keyboardType: TextInputType.phone
+          ),
           const SizedBox(height: 12),
-          ListTile(leading: const Icon(Icons.calendar_today), title: Text('Ngày: $dateDisplay'), onTap: _pickDate),
-          ListTile(leading: const Icon(Icons.access_time), title: Text('Giờ: ${_selectedTime.format(context)}'), onTap: _pickTime),
-          TextField(controller: _notesController, decoration: const InputDecoration(labelText: 'Ghi chú'), maxLines: 3),
+          TextField(
+            controller: _addressController, 
+            decoration: const InputDecoration(
+              labelText: 'Địa chỉ (Tùy chọn)', 
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.location_on_outlined)
+            ),
+          ),
+          const SizedBox(height: 12),
+          // (SỬA) Dùng Card cho đẹp
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.calendar_today, color: Colors.blue), 
+              title: Text('Ngày: $dateDisplay'), 
+              trailing: const Icon(Icons.keyboard_arrow_down),
+              onTap: _pickDate
+            ),
+          ),
+          const SizedBox(height: 12),
+          Card(
+            child: ListTile(
+              leading: const Icon(Icons.access_time, color: Colors.blue), 
+              title: Text('Giờ: ${_selectedTime.format(context)}'), 
+              trailing: const Icon(Icons.keyboard_arrow_down),
+              onTap: _pickTime
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _notesController, 
+            decoration: const InputDecoration(
+              labelText: 'Ghi chú (Tùy chọn)', 
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.note_alt_outlined)
+            ), 
+            maxLines: 3
+          ),
           const SizedBox(height: 20),
           SizedBox(
             width: double.infinity,
+            height: 50, // (MỚI) Thêm chiều cao
             child: ElevatedButton(
-              onPressed: _saveChanges,
-              child: const Text('Lưu'),
+              // ======================================================
+              // === ✨ THAY ĐỔI: VÔ HIỆU HÓA NÚT KHI KHÔNG THAY ĐỔI ===
+              onPressed: _isChanged ? _saveChanges : null,
+              // ======================================================
+              style: ElevatedButton.styleFrom(
+                foregroundColor: Colors.white,
+                disabledBackgroundColor: Colors.grey.shade300,
+                backgroundColor: Colors.blue.shade700,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))
+              ),
+              child: const Text('Lưu thay đổi', style: TextStyle(fontSize: 16)), // (SỬA)
             ),
           )
         ]),

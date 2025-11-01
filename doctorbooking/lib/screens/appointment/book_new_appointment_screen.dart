@@ -135,11 +135,11 @@ class _BookNewAppointmentScreenState extends State<BookNewAppointmentScreen> {
       'child_care': Icons.child_care,
       'remove_red_eye': Icons.remove_red_eye,
       'hearing': Icons.hearing,
-      'self_improvement': Icons.self_improvement,
-      'favorite': Icons.favorite,
-      'psychology': Icons.psychology,
-      'accessible_forward': Icons.accessible_forward,
-      'air': Icons.air,
+      'self_improvement': Icons.self_improvement, // Da Liễu
+      'favorite': Icons.favorite, // Tim Mạch
+      'psychology': Icons.psychology, // Thần Kinh
+      'accessible_forward': Icons.accessible_forward, // Cơ Xương Khớp
+      'air': Icons.air, // Hô Hấp
       'medical_services': Icons.medical_services,
       'pregnant_woman': Icons.pregnant_woman,
     };
@@ -194,16 +194,18 @@ class _BookNewAppointmentScreenState extends State<BookNewAppointmentScreen> {
           ] else if (_specialties.isEmpty) ...[
             const SizedBox(height: 120, child: Center(child: Text('Hiện chưa có chuyên khoa nào.'))),
           ] else ...[
-            // Grid of specialties
-            Expanded(
-              flex: 2,
+            SizedBox(
+              height: 250, // Giữ chiều cao để cuộn 2 hàng
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: GridView.count(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 1,
+                  crossAxisCount: 4, // 4 ô mỗi hàng
+                  mainAxisSpacing: 18, // Khoảng cách dọc
+                  crossAxisSpacing: 18, // Khoảng cách ngang
+                  // ======================================================
+                  // === ✨ THAY ĐỔI: SỬA LỖI OVERFLOW ===
+                  childAspectRatio: 0.7, // Giảm tỷ lệ để tăng chiều cao cho ô
+                  // ======================================================
                   children: _specialties.map((s) {
                     final name = s.name ?? '';
                     final id = s.id;
@@ -212,18 +214,38 @@ class _BookNewAppointmentScreenState extends State<BookNewAppointmentScreen> {
 
                     return InkWell(
                       onTap: () => _selectSpecialty(id),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isSelected ? Colors.blue.shade700 : Colors.blue.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: isSelected ? Colors.blue.shade800 : Colors.transparent, width: 1.2),
-                        ),
-                        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                          Icon(icon, color: isSelected ? Colors.white : Colors.blue.shade700, size: 30),
+                      borderRadius: BorderRadius.circular(100),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 65,
+                            height: 65,
+                            decoration: BoxDecoration(
+                              color: isSelected ? Colors.blue.shade800 : Colors.blue.shade50,
+                              shape: BoxShape.circle,
+                              border: isSelected ? Border.all(color: Colors.blue.shade900, width: 2.0) : null,
+                            ),
+                            child: Center(
+                              child: Icon(
+                                icon,
+                                color: isSelected ? Colors.white : Colors.blue.shade700,
+                                size: 28,
+                              ),
+                            ),
+                          ),
                           const SizedBox(height: 6),
-                          Padding(padding: const EdgeInsets.symmetric(horizontal: 4.0), child: Text(name, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: isSelected ? Colors.white : Colors.blue.shade900, fontWeight: isSelected ? FontWeight.bold : FontWeight.normal))),
-                        ]),
+                          Text(
+                            name,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isSelected ? Colors.blue.shade900 : const Color.fromARGB(255, 0, 0, 0),
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal
+                            )
+                          ),
+                        ],
                       ),
                     );
                   }).toList(),
@@ -262,7 +284,7 @@ class _BookNewAppointmentScreenState extends State<BookNewAppointmentScreen> {
 }
 
 // ============================================================
-
+// === DOCTOR CARD KHÔNG THAY ĐỔI ===
 // ============================================================
 
 class DoctorCard extends StatelessWidget {
@@ -287,7 +309,7 @@ class DoctorCard extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => DetailsScreen(
-                doctor: doctor, 
+                doctor: doctor,
                 onBookAppointment: (bookingDoctor, bookingDetails) {
                   // propagate callback with API model
                   onBookAppointment(bookingDoctor as Doctor, bookingDetails);

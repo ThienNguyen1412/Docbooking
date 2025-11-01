@@ -8,20 +8,19 @@ import 'service_booking_screen.dart';
 
 class ServiceDetailScreen extends StatelessWidget {
   final HealthPackage healthPackage;
+  
   // ✨ 2. CẬP NHẬT "CHỮ KÝ" (SIGNATURE) CỦA HÀM TẠI ĐÂY
+  // (MỚI) Thêm callback để chuyển tab sau khi hoàn tất
+  final VoidCallback onBookingCompleteGoToAppointments; 
 
   final Function(AppNotification) addNotification;
 
   const ServiceDetailScreen({
     super.key,
     required this.healthPackage,
-
     required this.addNotification,
+    required this.onBookingCompleteGoToAppointments, // ✨ (MỚI) Thêm vào constructor
   });
-
-  // ✨ 3. THAY THẾ HÀM `_bookService` BẰNG HÀM HIỂN THỊ FORM ĐẶT LỊCH
-  // Tái sử dụng lại logic từ `DetailsScreen` để đảm bảo tính nhất quán
- 
 
   // Hàm xây dựng danh sách các bước khám (giữ nguyên)
   Widget _buildStepsList() {
@@ -119,7 +118,14 @@ class ServiceDetailScreen extends StatelessWidget {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.grey[700]),
                   ),
                   const SizedBox(height: 4),
-                  Row(
+
+                  // ======================================================
+                  // === ✨ SỬA LỖI OVERFLOW BẰNG CÁCH DÙNG WRAP ===
+                  // ======================================================
+                  Wrap(
+                    spacing: 10.0, // Khoảng cách ngang giữa các item
+                    runSpacing: 4.0, // Khoảng cách dọc nếu xuống hàng
+                    crossAxisAlignment: WrapCrossAlignment.center, // Căn giữa các item
                     children: [
                       Text(
                         healthPackage.formattedPrice, 
@@ -130,28 +136,27 @@ class ServiceDetailScreen extends StatelessWidget {
                         ),
                       ),
                       if (healthPackage.isDiscount && healthPackage.oldPrice != null)
-                        Padding(
-                          padding: const EdgeInsets.only(left: 10),
-                          child: Text(
-                            healthPackage.formattedOldPrice ?? '', 
-                            style: const TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey,
-                              decoration: TextDecoration.lineThrough,
-                            ),
+                        Text(
+                          healthPackage.formattedOldPrice ?? '', 
+                          style: const TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey,
+                            decoration: TextDecoration.lineThrough,
                           ),
                         ),
                       if (healthPackage.isDiscount)
-                        const Padding(
-                          padding: EdgeInsets.only(left: 10),
-                          child: Chip(
-                            label: Text('GIẢM GIÁ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
-                            backgroundColor: Colors.red,
-                            padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          ),
+                        const Chip(
+                          label: Text('GIẢM GIÁ', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+                          backgroundColor: Colors.red,
+                          padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          visualDensity: VisualDensity(horizontal: 0.0, vertical: -4), // Làm cho chip nhỏ hơn
+                          labelPadding: EdgeInsets.symmetric(horizontal: 4.0), // Giảm padding bên trong chip
                         ),
                     ],
                   ),
+                  // ======================================================
+                  // === KẾT THÚC SỬA LỖI ===
+                  // ======================================================
                 ],
               ),
             ),
@@ -172,6 +177,8 @@ class ServiceDetailScreen extends StatelessWidget {
                 builder: (ctx) => ServiceBookingScreen(
                   healthPackage: healthPackage, // Truyền gói khám
                   addNotification: addNotification, // Truyền hàm callback
+                  // ✨ (MỚI) Truyền callback này xuống màn hình Booking
+                  onBookingCompleteGoToAppointments: onBookingCompleteGoToAppointments, 
                 ),
               ),
             );

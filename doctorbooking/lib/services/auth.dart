@@ -6,7 +6,7 @@ import 'package:doctorbooking/models/user.dart';
 
 class AuthService {
   // Update this to match your backend
-  static const String baseUrl = "http://192.168.111.219:5101/api/auth";
+  static const String baseUrl = "https://103f6194a519.ngrok-free.app/api/auth";
 
   // Keys for SharedPreferences
   static const String _kTokenKey = 'auth_token';
