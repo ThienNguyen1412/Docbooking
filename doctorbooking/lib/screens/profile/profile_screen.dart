@@ -1,7 +1,10 @@
+import 'dart:io'; // MỚI: Cần thiết cho File
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart'; // MỚI: Thư viện chọn ảnh
 import 'update_profile_screen.dart';
 import 'change_password_screen.dart';
 import 'support_screen.dart';
+import 'policy_screen.dart';
 import '../../services/auth.dart';
 import '../../models/user.dart';
 import '../admin/admin_home_screen.dart';
@@ -18,8 +21,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // Trạng thái chứa tên, email và role lấy từ Auth (token / SharedPreferences)
   String _authName = '';
   String _authEmail = '';
+  String _authAvatarUrl = ''; // MỚI: Thêm trạng thái cho ảnh đại diện "gốc"
   int? _authRole;
   bool _isLoadingNavigate = false;
+
+  // MỚI: Thêm state để lưu đường dẫn ảnh demo (chỉ lưu tạm ở UI)
+  // CẬP NHẬT: Thêm 'static' để biến này tồn tại cho đến khi app bị tắt hẳn
+  static String _tempAvatarPath = ''; // Sẽ chứa đường dẫn file cục bộ
+
+  // MỚI: Khởi tạo image picker
+  final ImagePicker _picker = ImagePicker();
 
   @override
   void initState() {
@@ -33,17 +44,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
       if (user != null) {
         // ưu tiên fullname nếu có, fallback sang email
-        final name = (user.fullName.isNotEmpty) ? user.fullName : (user.email.isNotEmpty ? user.email : '');
+        final name = (user.fullName.isNotEmpty)
+            ? user.fullName
+            : (user.email.isNotEmpty ? user.email : '');
         setState(() {
           _authName = name;
           _authEmail = user.email;
           _authRole = user.role;
+          // CẬP NHẬT: Gán ảnh đại diện "gốc" (từ auth service)
+          // Giả sử model User của bạn có trường `avatarUrl`
+          
+          // LỖI: Dòng "user.avatarUrl" gây lỗi vì class User (trong models/user.dart)
+          // của bạn không có thuộc tính "avatarUrl".
+          // _authAvatarUrl = user.avatarUrl ?? ''; // <--- DÒNG GÂY LỖI
+          
+          // SỬA TẠM: Gán rỗng để hết lỗi.
+          // Để sửa đúng, hãy mở 'models/user.dart' và thêm 'String? avatarUrl'.
+          _authAvatarUrl = ''; 
         });
       } else {
         setState(() {
           _authName = '';
           _authEmail = '';
           _authRole = null;
+          _authAvatarUrl = ''; // CẬP NHẬT: Reset avatar
         });
       }
     } catch (e) {
@@ -52,19 +76,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _authName = '';
         _authEmail = '';
         _authRole = null;
+        _authAvatarUrl = ''; // CẬP NHẬT: Reset avatar
       });
     }
   }
 
-  // Điều hướng tới UpdateProfileScreen — LẤY NGƯỜI DÙNG TỪ AuthService và truyền vào màn hình
+  // Điều hướng tới UpdateProfileScreen
   void _navigateToUpdateProfile() async {
+    // ... (logic hàm này giữ nguyên)
     setState(() => _isLoadingNavigate = true);
     try {
-      // Lấy user từ AuthService
       final User? user = await AuthService.instance.getUser();
-
       if (user == null) {
-        // Nếu không có user, yêu cầu đăng nhập
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Vui lòng đăng nhập để cập nhật thông tin.'),
@@ -73,14 +96,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Navigator.of(context).pushNamedAndRemoveUntil('/login', (r) => false);
         return;
       }
-
-      // Push màn hình UpdateProfileScreen, truyền user vào
       final result = await Navigator.push<User?>(
         context,
         MaterialPageRoute(builder: (c) => UpdateProfileScreen(user: user)),
       );
-
-      // Nếu màn hình trả về User (hoặc bất kỳ non-null) => load lại dữ liệu từ Auth (để cập nhật hiển thị)
       if (result != null && mounted) {
         await _loadUserFromAuth();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -103,15 +122,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+
+  Future<void> _pickAndUpdateAvatar() async {
+    // 1. Yêu cầu người dùng chọn ảnh
+    final XFile? pickedFile = await _picker.pickImage(
+      source: ImageSource.gallery, // Lấy từ thư viện, có thể đổi sang .camera
+      imageQuality: 80, // Nén ảnh
+    );
+
+    // Nếu người dùng không chọn ảnh, hủy
+    if (pickedFile == null) return;
+
+    setState(() {
+      _tempAvatarPath = pickedFile.path;
+    });
+
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Cập nhật thành công'),
+        backgroundColor: Colors.blue,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     // Hiển thị chỉ dựa trên dữ liệu lấy từ AuthService (không fallback về sample store)
     final displayName = _authName.isNotEmpty ? _authName : 'Người dùng';
     final displayEmail = _authEmail.isNotEmpty ? _authEmail : '';
 
-    // Xây dựng danh sách features, thêm nút Admin NẾU role == 0
+    // Xây dựng danh sách features... (Giữ nguyên logic)
     final List<_ProfileFeature> features = [];
-
     if (_authRole == 0) {
       features.add(
         _ProfileFeature(
@@ -121,7 +163,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       );
     }
-
     features.addAll([
       _ProfileFeature(
         icon: Icons.person_outline,
@@ -145,7 +186,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
       _ProfileFeature(
         icon: Icons.policy_outlined,
         title: 'Điều khoản & Chính sách',
-        onTap: () {},
+        onTap: () {
+           Navigator.push(context, MaterialPageRoute(builder: (c) => const TermsAndPolicyScreen()));
+        },
       ),
     ]);
 
@@ -162,7 +205,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
           SingleChildScrollView(
             child: Column(
               children: [
-                _buildUserInfoHeader(name: displayName, email: displayEmail),
+                _buildUserInfoHeader(
+                  name: displayName,
+                  email: displayEmail,
+                  authAvatarUrl: _authAvatarUrl,
+                  tempAvatarPath: _tempAvatarPath, // Biến static sẽ được đọc ở đây
+                  onEditAvatar: _pickAndUpdateAvatar,
+                ),
                 const SizedBox(height: 20),
                 _buildFeaturesList(features),
                 const SizedBox(height: 20),
@@ -183,9 +232,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildUserInfoHeader({required String name, required String email}) {
+  // CẬP NHẬT: Widget này giờ nhận `authAvatarUrl` và `tempAvatarPath`
+  Widget _buildUserInfoHeader({
+    required String name,
+    required String email,
+    required String authAvatarUrl, // Ảnh "gốc"
+    required String tempAvatarPath,
+    required VoidCallback onEditAvatar,
+  }) {
     final initials = _getInitials(name);
-    String avatarUrl = 'https://img.lovepik.com/free-png/20220101/lovepik-tortoise-png-image_401154498_wh860.png';
+
+    // MỚI: Logic quyết định hiển thị ảnh nào
+    ImageProvider? backgroundImage;
+    if (tempAvatarPath.isNotEmpty) {
+      backgroundImage = FileImage(File(tempAvatarPath));
+    } else {
+      final bool hasValidAuthAvatar = authAvatarUrl.isNotEmpty && (authAvatarUrl.startsWith('http') || authAvatarUrl.startsWith('https:'));
+      if (hasValidAuthAvatar) {
+        backgroundImage = NetworkImage(authAvatarUrl);
+      } else {
+        // CẬP NHẬT: Dùng ảnh rùa làm ảnh mẫu nếu không có gì
+        backgroundImage = const NetworkImage('https://img.lovepik.com/free-png/20220101/lovepik-tortoise-png-image_401154498_wh860.png');
+      }
+    }
+    // Ưu tiên 3: Nếu (backgroundImage == null), child (chữ cái) sẽ hiển thị
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -194,7 +265,37 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
       child: Row(
         children: [
-          CircleAvatar(radius: 40, backgroundImage: NetworkImage(avatarUrl)),
+          Stack(
+            alignment: Alignment.bottomRight,
+            children: [
+              CircleAvatar(
+                radius: 40,
+                backgroundColor: Colors.blue.shade100, // Màu nền fallback
+                backgroundImage: backgroundImage, // CẬP NHẬT: Dùng 1 imageProvider
+                // Chỉ hiển thị chữ nếu không có ảnh nào (kể cả ảnh mẫu)
+                child: (backgroundImage == null) 
+                    ? Text(
+                        initials.isNotEmpty ? initials : '?',
+                        style: TextStyle(fontSize: 30, color: Colors.blue.shade800, fontWeight: FontWeight.bold),
+                      )
+                    : null,
+              ),
+              // Nút Edit
+              Material(
+                color: Colors.white,
+                shape: const CircleBorder(),
+                elevation: 2,
+                child: InkWell(
+                  onTap: onEditAvatar, // MỚI: Gọi hàm chọn ảnh
+                  customBorder: const CircleBorder(),
+                  child: const Padding(
+                    padding: EdgeInsets.all(5.0),
+                    child: Icon(Icons.edit, size: 18, color: Colors.blue),
+                  ),
+                ),
+              )
+            ],
+          ),
           const SizedBox(width: 20),
           Expanded(
             child: Column(
@@ -225,6 +326,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   String _getInitials(String fullName) {
+    if (fullName.isEmpty || fullName == 'Người dùng') return '';
     final parts = fullName.trim().split(RegExp(r'\s+'));
     if (parts.isEmpty) return '';
     if (parts.length == 1) return parts[0].substring(0, 1).toUpperCase();
@@ -232,6 +334,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildFeaturesList(List<_ProfileFeature> features) {
+    // ... (Hàm này giữ nguyên)
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Card(
@@ -257,6 +360,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildLogoutButton(BuildContext context) {
+    // ... (Hàm này giữ nguyên)
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0),
       child: Card(
@@ -312,3 +416,4 @@ class _ProfileFeature {
     required this.onTap,
   });
 }
+

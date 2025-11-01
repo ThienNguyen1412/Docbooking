@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../models/doctor.dart'; // use API model (Doctors) for booking callback
 import 'book_new_appointment_screen.dart';
-import 'appointment_detail_screen.dart';
+// ✨ (QUAN TRỌNG) Thêm import này để gọi EditAppointmentScreenShim
+import 'appointment_detail_screen.dart'; 
 import '../../models/appointments.dart' as model;
 import '../home/details_screen.dart';
 
@@ -32,6 +33,7 @@ class AppointmentScreen extends StatelessWidget {
         appBar: AppBar(
           title: const Text('Lịch Hẹn Của Bạn'),
           backgroundColor: Colors.blue.shade800,
+          foregroundColor: Colors.white,
           elevation: 0,
           automaticallyImplyLeading: false,
           bottom: const TabBar(
@@ -99,10 +101,14 @@ class AppointmentScreen extends StatelessWidget {
   }
 }
 
+// ====================================================================
+// === CLASS APPOINTMENTLISTVIEW (ĐÃ CẬP NHẬT LOGIC NÚT SỬA) ===
+// ====================================================================
+
 class AppointmentListView extends StatelessWidget {
   final List<model.Appointment> appointments;
   final void Function(model.Appointment) onDelete;
-  final void Function(model.Appointment) onEdit;
+  final void Function(model.Appointment) onEdit; // onEdit này sẽ được gọi sau khi sửa xong
   final List<String> statusFilter;
 
   const AppointmentListView({
@@ -144,6 +150,26 @@ class AppointmentListView extends StatelessWidget {
         onDelete(appointment); // Gọi hàm xóa/hủy (parent sẽ call API)
       }
     });
+  }
+
+  // ✨ (MỚI) HÀM XỬ LÝ KHI NHẤN NÚT SỬA (✏️)
+  Future<void> _onTapEdit(BuildContext context, model.Appointment appointment) async {
+    // 1. Mở màn hình EditAppointmentScreenShim
+    final updated = await Navigator.push<model.Appointment>(
+      context,
+      MaterialPageRoute(
+        // Gọi EditAppointmentScreenShim (từ file appointment_detail_screen.dart)
+        builder: (ctx) => EditAppointmentScreenShim(initialAppointment: appointment),
+      ),
+    );
+
+    // 2. Kiểm tra kết quả
+    // Nếu updated == null, nghĩa là người dùng nhấn Back hoặc không thay đổi gì
+    if (updated == null) return; 
+
+    // 3. Nếu có thay đổi (updated != null), báo cho parent (MyAppointmentsPage)
+    // để nó tải lại danh sách và hiển thị SnackBar "Cập nhật thành công"
+    onEdit(updated);
   }
 
   @override
@@ -240,7 +266,10 @@ class AppointmentListView extends StatelessWidget {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.edit_calendar_outlined, color: Colors.orange),
-                      onPressed: () => onEdit(appointment),
+                      // ======================================================
+                      // === ✨ THAY ĐỔI: GỌI HÀM _onTapEdit MỚI ===
+                      onPressed: () => _onTapEdit(context, appointment),
+                      // ======================================================
                       tooltip: 'Sửa lịch hẹn',
                     ),
                     IconButton(
@@ -269,7 +298,7 @@ class AppointmentListView extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             ),
             subtitle: subtitleWidget,
-            isThreeLine: isCancelled ? true : true,
+            isThreeLine: true, // Đặt cố định là true để giữ chiều cao ổn định
             trailing: trailingWidget,
             onTap: () {
               Navigator.push(

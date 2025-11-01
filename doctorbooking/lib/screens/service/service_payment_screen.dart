@@ -5,23 +5,35 @@ import 'package:flutter/services.dart';
 import 'package:qr_flutter/qr_flutter.dart'; 
 import 'package:vietqr_gen/vietqr_generator.dart'; 
 import 'package:uuid/uuid.dart';
-import 'package:intl/intl.dart'; // ✨ THÊM DÒNG IMPORT NÀY
+import 'package:intl/intl.dart'; 
 
 import '../../../models/health_package.dart';
 import '../home/details_screen.dart'; 
 import '../../../models/notification.dart';
+// ✨ (QUAN TRỌNG) Thêm import service để gọi API
+import '../../../services/appointment.dart'; 
+
+// ✨ (QUAN TRỌNG) Thêm import này để có thể dùng showLoadingDialog
+// (Giả sử file này nằm trong thư mục 'appointment' cùng cấp)
+import '../appointment/appointment_detail_screen.dart';
+
 
 class ServicePaymentScreen extends StatefulWidget {
   final HealthPackage healthPackage;
   final BookingDetails bookingDetails;
 
   final Function(AppNotification) addNotification;
+  
+  // ✨ (MỚI) Thêm callback này để ra lệnh chuyển tab
+  // Bạn sẽ cần truyền nó từ màn hình chính (main_screen.dart)
+  final VoidCallback? onBookingCompleteGoToAppointments;
 
   const ServicePaymentScreen({
     super.key,
     required this.healthPackage,
     required this.bookingDetails,
     required this.addNotification,
+    this.onBookingCompleteGoToAppointments, // ✨ (MỚI)
   });
 
   @override
@@ -30,6 +42,7 @@ class ServicePaymentScreen extends StatefulWidget {
 
 class _ServicePaymentScreenState extends State<ServicePaymentScreen> {
   int _selectedPaymentMethod = 0;
+  bool _isBooking = false; // ✨ (MỚI) Thêm cờ để xử lý trạng thái loading
 
   final Bank _bankEnum = Bank.acb; 
   final String _accountNo = '23071517'; 
@@ -61,40 +74,96 @@ class _ServicePaymentScreenState extends State<ServicePaymentScreen> {
     }
   }
 
- void _completeBooking(BuildContext context, String method) {
-  
-    // Bước 2: Tạo thông báo "Đặt Dịch Vụ" (thay vì "Đặt Bác Sĩ")
-    final notification = AppNotification(
-      id: _uuid.v4(),
-      title: 'Đặt dịch vụ thành công!',
-      body:
-          'Bạn đã đặt thành công dịch vụ "${widget.healthPackage.name}" vào lúc ${widget.bookingDetails.time.format(context)} ngày ${DateFormat('dd/MM/yyyy').format(widget.bookingDetails.date)}.',
-     date: DateTime.now(),
-    );
+  // ======================================================
+  // === ✨ (ĐÃ CẬP NHẬT) HÀM HOÀN TẤT ĐẶT LỊCH ===
+  // ======================================================
+  Future<void> _completeBooking(BuildContext context, String method) async {
+    // (MỚI) Ngăn nhấn nút nhiều lần
+    if (_isBooking) return;
+    setState(() { _isBooking = true; });
 
-    // Bước 3: Gọi hàm addNotification để hiển thị thông báo
-    widget.addNotification(notification);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          notification.title, // Lấy luôn tiêu đề của thông báo
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-        backgroundColor: Colors.green.shade600,
-        behavior: SnackBarBehavior.floating, // Cho snackbar nổi lên
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(10.0),
-        ),
-        margin: const EdgeInsets.all(10.0),
-      ),
-    );
+    // (MỚI) Hiển thị dialog loading
+    final closeLoading = await showLoadingDialog(context, message: 'Đang xác nhận lịch hẹn...');
 
-    // Bước 4: (Giữ nguyên) Quay về màn hình trước đó
-    // (Bạn có thể muốn pop về tận root hoặc màn hình chính)
-    // Ví dụ: Quay về 2 lần để thoát khỏi màn hình Booking và Payment
-    int popCount = 0;
-    Navigator.of(context).popUntil((_) => popCount++ >= 3);
+    try {
+      // (MỚI) BƯỚC 1: GỌI API ĐỂ LƯU LỊCH HẸN DỊCH VỤ
+      // (Giả sử bạn có hàm 'createServiceAppointment' trong service)
+      
+      /*
+      // Bỏ comment khối này khi bạn đã có API
+      await AppointmentService.instance.createServiceAppointment(
+        packageId: widget.healthPackage.id,
+        bookingDetails: widget.bookingDetails,
+        paymentMethod: method,
+      );
+      */
+      
+      // (TẠM THỜI) Giả lập độ trễ API
+       await Future.delayed(const Duration(seconds: 2));
+
+
+      // (CÓ SẴN) Bước 2: Tạo thông báo
+      final notification = AppNotification(
+        id: _uuid.v4(),
+        title: 'Đặt dịch vụ thành công!',
+        body:
+            'Bạn đã đặt thành công dịch vụ "${widget.healthPackage.name}" vào lúc ${widget.bookingDetails.time.format(context)} ngày ${DateFormat('dd/MM/yyyy').format(widget.bookingDetails.date)}.',
+        date: DateTime.now(),
+      );
+
+      // (CÓ SẴN) Bước 3: Gọi callback thông báo
+      widget.addNotification(notification);
+      
+      // (MỚI) Đóng loading
+      closeLoading(); 
+
+      // (MỚI) Hiển thị SnackBar thành công
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              notification.title, 
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            backgroundColor: Colors.green.shade600,
+            behavior: SnackBarBehavior.floating, 
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10.0),
+            ),
+            margin: const EdgeInsets.all(10.0),
+          ),
+        );
+      }
+
+      // (CẬP NHẬT) Bước 4: Quay về Root và Chuyển Tab
+      if (mounted) {
+        // Pop tất cả các màn hình trong stack hiện tại (Payment, Booking, Detail)
+        // để quay về màn hình gốc của tab (ví dụ: màn hình Services)
+        Navigator.of(context).popUntil((route) => route.isFirst);
+
+        // (MỚI) Gọi callback để ra lệnh cho main_screen chuyển tab
+        widget.onBookingCompleteGoToAppointments?.call();
+      }
+
+    } catch (e) {
+      // (MỚI) Xử lý lỗi
+      closeLoading();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Đặt dịch vụ thất bại: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      // (MỚI) Hoàn tất, cho phép nhấn nút lại
+      if (mounted) {
+        setState(() { _isBooking = false; });
+      }
+    }
   }
+
 
   void _copyToClipboard(String text, String label) {
     Clipboard.setData(ClipboardData(text: text));
@@ -152,23 +221,31 @@ class _ServicePaymentScreenState extends State<ServicePaymentScreen> {
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ElevatedButton(
-          onPressed: () => _completeBooking(
+          // ✨ (CẬP NHẬT) Vô hiệu hóa nút khi đang booking
+          onPressed: _isBooking ? null : () => _completeBooking(
             context,
             _selectedPaymentMethod == 0 ? 'Thanh toán sau' : 'Chuyển khoản VietQR',
           ),
           style: ElevatedButton.styleFrom(
+            disabledBackgroundColor: Colors.grey.shade400, // ✨ (MỚI)
             backgroundColor: _selectedPaymentMethod == 0 ? Colors.green.shade600 : Colors.orange.shade700,
             foregroundColor: Colors.white,
             minimumSize: const Size(double.infinity, 55),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           ),
-          child: Text(
-            _selectedPaymentMethod == 0 ? 'XÁC NHẬN' : 'HOÀN TẤT THANH TOÁN',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
+          child: _isBooking // ✨ (CẬP NHẬT) Hiển thị loading
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+              )
+            : Text(
+                _selectedPaymentMethod == 0 ? 'XÁC NHẬN' : 'HOÀN TẤT THANH TOÁN',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
         ),
       ),
-    );  
+    ); 
   }
 
   Widget _buildSummaryCard(HealthPackage pkg, BookingDetails details) {

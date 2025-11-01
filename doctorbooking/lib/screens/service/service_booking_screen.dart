@@ -9,15 +9,16 @@ import '../home/details_screen.dart'; // Cần cho BookingDetails
 
 class ServiceBookingScreen extends StatefulWidget {
   final HealthPackage healthPackage;
-  // ✨ THÊM LẠI CÁC THAM SỐ BỊ THIẾU
-
+  
+  // ✨ (CẬP NHẬT) Thêm các tham số bị thiếu
   final Function(AppNotification) addNotification;
+  final VoidCallback onBookingCompleteGoToAppointments; // <-- (MỚI)
 
   const ServiceBookingScreen({
     super.key,
     required this.healthPackage,
-
     required this.addNotification,
+    required this.onBookingCompleteGoToAppointments, // <-- (MỚI)
   });
 
   @override
@@ -89,8 +90,9 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
           builder: (ctx) => ServicePaymentScreen(
             healthPackage: widget.healthPackage,
             bookingDetails: bookingDetails, // Truyền BookingDetails
-
             addNotification: widget.addNotification,
+            // ✨ (MỚI) Truyền callback này xuống màn hình Payment
+            onBookingCompleteGoToAppointments: widget.onBookingCompleteGoToAppointments,
           ),
         ),
       );
@@ -248,7 +250,7 @@ class _ServiceBookingScreenState extends State<ServiceBookingScreen> {
       controller: timeController,
       decoration: InputDecoration(
         labelText: 'Giờ Khám (*)',
-        prefixIcon: Icon(Icons.access_time_filled_rounded, color: Colors.blue.shade700),
+        prefixIcon: Icon(Icons.access_time_filled_rounded, color: Colors.blue.shade800),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         filled: true,
         fillColor: Colors.white,

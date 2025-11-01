@@ -144,6 +144,20 @@ class HealthPackage {
       // 3. GÓI KHÁM TIÊU CHUẨN (isDiscount = false, isFeatured = false)
       HealthPackage(
         id: 'pk003',
+        name: 'Kiểm tra sức khỏe tại nhà',
+        description: 'Hướng dẫn điều trị cho gia đình chăm sóc người bệnh tại nhà.',
+        price: 1090000,
+        image: 'https://benhviendakhoatinhphutho.vn/wp-content/uploads/2022/07/77c24dc12186e3d8ba97.jpg.webp',
+        steps: [
+          'Chăm sóc và thay băng vết thương, thay ống nuôi ăn, thay ống thông tiểu',
+          'Đặt đường truyền tĩnh mạch',
+          'Vật lý trị liệu và phục hồi chức năng',
+          'Lấy mẫu xét nghiệm',
+          'Điều dưỡng chăm sóc sau khi xuất viện'
+        ],
+      ),
+      HealthPackage(
+        id: 'pk004',
         name: 'Kiểm tra Sức khỏe Tổng quát Cơ bản',
         description: 'Bao gồm khám lâm sàng, xét nghiệm máu, nước tiểu, X-quang phổi.',
         price: 850000,
@@ -157,7 +171,7 @@ class HealthPackage {
         ],
       ),
       HealthPackage(
-        id: 'pk004',
+        id: 'pk005',
         name: 'Gói Khám Tiền Hôn Nhân Cơ bản',
         description: 'Kiểm tra sức khỏe sinh sản và tư vấn về kế hoạch hóa gia đình.',
         price: 1200000,
@@ -171,7 +185,7 @@ class HealthPackage {
         ],
       ),
       HealthPackage(
-        id: 'pk005',
+        id: 'pk006',
         name: 'Gói Khám Nhi khoa 0-6 tuổi',
         description: 'Theo dõi sự phát triển, tiêm chủng và tư vấn dinh dưỡng cho bé.',
         price: 900000,

@@ -14,7 +14,7 @@ class DoctorService {
   DoctorService._private();
   static final DoctorService instance = DoctorService._private();
 
-  static const String baseUrl = "http://192.168.111.219:5101/api/doctor";
+  static const String baseUrl = "https://103f6194a519.ngrok-free.app/api/doctor";
   static const Duration _timeout = Duration(seconds: 15);
 
   Future<String?> _getToken() async {
